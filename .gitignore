@@ -1,0 +1,14 @@
+*.tif
+*.png
+*.pdf
+*.svg
+.DS_Store
+.ipynb_checkpoints
+__pycache__
+*.class
+data
+*.xml
+*.asv
+*.m~
+namespace.py
+*.log
