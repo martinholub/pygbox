@@ -12,3 +12,4 @@ data
 *.m~
 namespace.py
 *.log
+main.py

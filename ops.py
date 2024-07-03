@@ -12,14 +12,18 @@ def project(im, how = 'max', ax = -1, kwargs = {}):
         print('Incorrect axis, projecting along the last axis')
     how = how.lower()
 
+    if im.shape[ax] == 1:
+        print('Cannot project along singleton dimension, returning unchnaged input.')
+        return im
+
     im = np.ma.masked_where(np.isnan(im), im)
 
     if how == 'max':
-        return max_project(im, ax)
+        return max_project(im, ax = ax)
     elif how == 'sum':
-        return sumi(im, None)
+        return sum_intensity(im, ax = ax, **kwargs)
     elif how == 'meanmax':
-        return meanmax_project(im, ax, **kwargs)
+        return meanmax_project(im, ax = ax, **kwargs)
     else:
         raise NotImplementedError
 
@@ -29,7 +33,7 @@ def max_project(im, ax):
     return np.max(im, ax, keepdims = False)
 
 
-def sum_intensity(im, mask = None, dx = None, do_bg_sub = False):
+def sum_intensity(im, ax = None, mask = None, dx = None, do_bg_sub = False):
     """ Compute sum intensity
     """
     if mask is None: # sum in whole image
@@ -40,13 +44,14 @@ def sum_intensity(im, mask = None, dx = None, do_bg_sub = False):
     if (im[mask==0].size > 0) & (do_bg_sub):
         im = bg_sub(im, mask)
 
-    try:
-        values = im[mask > 0]
-    except Exception as e:
-        print('Invalid mask. Returning NaN')
-        return np.nan
-    sumi = np.sum(values)
-    return int(sumi)
+    if ax is not None:
+        return np.sum(im, axis = ax, dtype = np.int)
+    else:
+        try:
+            return int(np.sum(im[mask > 0]))
+        except Exception as e:
+            print('Invalid mask. Returning NaN')
+            return np.nan
 
 
 def meanmax_project(im, ax = -1, n = 5):
@@ -233,6 +238,7 @@ def radius_of_gyration(im, mask, dx, do_bg_sub = True):
     im = np.nan_to_num(im)
     # 3D center of mass
     cm = center_of_mass(im)
+    if len(cm) == 2: cm += (0, ); im = np.expand_dims(im, 2)
 
     # Anisotropic coordinates w.r.t center of mass
     xx, yy, zz = aniso_mesh(im.shape, dx, cm, 'ij')
@@ -240,7 +246,6 @@ def radius_of_gyration(im, mask, dx, do_bg_sub = True):
     r2 = xx**2 + yy**2 + zz**2
     # radius if gyration - image weighted radial distance
     rg = np.sqrt(np.sum(r2*im)/np.sum(im))
-
     return rg
 
 def aniso_mesh(nX, dx = (1, 1, 1), cm = (0, 0, 0), indexing = 'ij'):
@@ -355,3 +360,101 @@ def map_labels(labels, mapping = None):
             out[labels == lab] = target
 
     return out
+
+############# TRAPPING OPS
+def simple_resample(x, y, dx = 1.0):
+    """Downsamples data to given dx
+
+    works when data is measured in mostly equal way, otherwise will be very lossy
+
+    TODO: implement interpolation
+    """
+    dx_in = np.unique(np.diff(x))
+
+    if len(dx_in) > 1:
+        #raise ValueError('Uneven data sampling in `simple_resample`')
+        return lin_interp(x, y, dx)
+        #return np.asarray([np.nan]), np.asarray([np.nan])
+
+    # no need to resample
+    if dx_in[0] == dx:
+        return x, y
+
+    #downsample
+    if dx_in[0] < dx:
+        keepidx = ((x - x[0]) % dx) == 0
+        return (x[keepidx], y[keepidx])
+    else:
+        #raise NotImplementedError("Upsampling currently not implemented.")
+        return lin_interp(x, y, dx)
+        #return np.asarray([np.nan]), np.asarray([np.nan])
+
+def lin_interp(x, y, dx):
+    """ linear interpolation """
+    xp = np.arange(x[0], x[-1]+dx, dx)
+    yp = np.interp(xp, x, y)
+    return xp, yp
+
+
+def pad_data(xydata, padval = np.nan):
+    """Pad data to constant length
+
+    Appends `padval` to 1D arrays to make the same length
+
+    """
+    maxlen = np.max([len(x) for x, _ in xydata])
+    padwidth = [maxlen - len(x) for x, _ in xydata]
+
+    xydata_out = []
+    for w, (x, y) in zip(padwidth, xydata):
+        xx = np.append(x, [padval]*w)
+        yy = np.append(y, [padval]*w)
+        xydata_out.append((xx, yy))
+    return xydata_out
+
+def summarize_data(xydata):
+    """compute descriptive statistics"""
+    x = np.asarray([x for x, _ in xydata])
+    y = np.asarray([y for _, y in xydata])
+
+    x = np.nanmean(x, axis = 0) # reduce dimension, formality
+
+    # y-error
+    n = np.count_nonzero(~np.isnan(y), axis = 0)
+    ystd = np.nanstd(y, axis = 0)
+    yerr = ystd / np.sqrt(n)
+
+    # y-stat
+    y = np.nanmean(y, axis = 0)
+
+    return x, y, (ystd, yerr)
+
+def relative_y(y):
+    """
+    Make y relative to (t0, y0)
+    """
+    idx = np.min(np.flatnonzero(~np.isnan(y) & (y > 0)))
+    y0 = np.nanmean(y[idx:idx+3])
+    return y / y0
+
+def subset_data(data, maxX = (1, 60), maxY = (0, 2.5e4)):
+    """Throw away data
+
+    maxX: x axis is trimmed beyond this value
+    maxY0: maximum value of y0; arrays exceeding it are dropped
+
+    TODO: make the y handling smarter?, maybe you dont have to drop it really, if you are now averaging.
+    """
+    # conditions for keeping timesieres
+    keepx = lambda x, maxX: x[-1] >= maxX # require time to run at least to maxX
+    keepy = lambda y, maxY: y[0] <= maxY # TODO, find better way to account for few initial bad points
+
+    # conditions for trimming timeseries (could be superseded)
+    trimx = lambda x, maxX: x <= maxX # drop data beyond maxX
+    #TODO: (may not be necessary, can acccount for by plot limits)
+
+    trimdata = [(i, (x[trimx(x, maxX[1])], y[trimx(x, maxX[1])])) \
+                for i, (x, y) in data \
+                if (keepy(y, maxY[1]) & keepx(x, maxX[0]))]
+
+    return trimdata

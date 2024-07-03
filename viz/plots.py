@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from pygbox import ops
 import seaborn as sns
+import itertools
 
 def set_plot_style(pltstyle = 'seaborn-paper', kwargs = {}):
     plt.style.use(pltstyle)
@@ -121,7 +122,8 @@ def customize_violin(ax, x, parts, stat = 'median'):
     ax.yaxis.set_ticks_position('both')
     # get colors, but drpp the first color
     colors = plt.rcParams['axes.prop_cycle'].by_key()
-    colors = ['#9467bd', '#2ca02c', '#ff7f0e']
+    #colors = ['#9467bd', '#2ca02c', '#ff7f0e', ''#ff7f0e'']
+    import pdb; pdb.set_trace()
     if len(x) > 2:
         colors = np.roll(np.array(colors), 1)
     for i, pc in enumerate(parts['bodies']):
@@ -281,8 +283,6 @@ def plot_msd(ax, tau, msd, msd_std, kwargs = {}):
 
     name_ax(ax, xlab = 'lag time [s]', ylab = 'MSD $[\mu m^2$]')
 
-
-
     # force ticks
     ax.yaxis.set_ticks(ticks = np.arange(0, 1.5, 0.5))
     ax.yaxis.set_ticks_position('both')
@@ -390,3 +390,70 @@ def first_nonzero_index(x):
         fnzi = indices[0]
 
     return fnzi
+
+def annotate_stat(ax, data, pos = None, text="*"):
+    """
+     Annotate plot with result of statistical test.
+    """
+    if not pos:
+        pos = ax.get_xaxis()
+    y = np.max(np.concatenate(data))
+    h = y * 0.1
+    ax.plot(np.repeat(pos, 2), [y+h, y+2*h, y+2*h, y+h], lw = 1.5, c ='k')
+    ax.text((pos[0]+pos[1])/2, y+2*h, text, ha = 'center', va = 'bottom', color = 'k')
+
+## EXPANSION PLOTS
+
+def grayscale_plot_markers():
+    """an iterator over marker/color combinations"""
+    import itertools
+    colors = ['#000000', '#bebebe', '#6a6a6a']
+    marks = ["D", "^", "s", ".", "o"]
+    # return endless iterator
+    return itertools.cycle(map(''.join, itertools.product(colors, marks)))
+
+
+def plot_expansion_scatter(ax, plotpairs, legends):
+    """Plot all indvidual measurements"""
+    markersmap = grayscale_plot_markers()
+
+    for i, (x, y) in plotpairs:
+        imarker = next(markersmap)
+        ax.plot(x, y, c = imarker[:-1], marker = imarker[-1], ls = "",
+                markersize = 3, alpha = 0.8, label = str(legends[i]))
+
+    # Put a legend to the right of the current axis
+    leg = ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), ncol = 2, fontsize = 6)
+    #leg = ax.legend(loc='lower right', ncol = 2, fontsize = 8)
+    leg.get_frame().set_alpha(0)
+
+    return ax
+
+def plot_expansion_shaded(ax, x, y, yerr):
+    """Plot mean and confidence interval"""
+
+    ax.plot(x, y, "k-")
+    ax.fill_between(x, y - yerr, y + yerr, color = "k", alpha = 0.2)
+    return ax
+
+def plot_expansion(data, legends = None):
+    """wrapper plot function"""
+    fig, ax = plots.make_fig(fig_kw = {"tight_layout": True})
+    plots.set_plot_style()
+
+    if isinstance(data[0][1], (tuple, )):
+        ax = plot_expansion_scatter(ax, data, legends)
+    else:
+        ax = plot_expansion_shaded(ax, *data)
+
+    # make plot look nice
+    xlim = ax.get_xlim()
+    ax.set_xlim(xlim[0], xlim[1]*1.05)
+    #plots.name_ax(ax, "$t\ [min]$", "$Rg\ [\mu m]$")
+    plots.name_ax(ax, "$t\ [min]$", "$Rg/Rg_0\ [-]$")
+    #plots.name_ax(ax, "$t\ [min]$", "$No.\ clusters$")
+
+    ylim = ax.get_ylim()
+    #ax.set_ylim(ylim[0], 1.50)
+
+    return ax
