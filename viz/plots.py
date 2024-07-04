@@ -438,8 +438,8 @@ def plot_expansion_shaded(ax, x, y, yerr):
 
 def plot_expansion(data, legends = None):
     """wrapper plot function"""
-    fig, ax = plots.make_fig(fig_kw = {"tight_layout": True})
-    plots.set_plot_style()
+    fig, ax = make_fig(fig_kw = {"tight_layout": True})
+    set_plot_style()
 
     if isinstance(data[0][1], (tuple, )):
         ax = plot_expansion_scatter(ax, data, legends)
@@ -450,7 +450,7 @@ def plot_expansion(data, legends = None):
     xlim = ax.get_xlim()
     ax.set_xlim(xlim[0], xlim[1]*1.05)
     #plots.name_ax(ax, "$t\ [min]$", "$Rg\ [\mu m]$")
-    plots.name_ax(ax, "$t\ [min]$", "$Rg/Rg_0\ [-]$")
+    name_ax(ax, "$t\ [min]$", "$Rg/Rg_0\ [-]$")
     #plots.name_ax(ax, "$t\ [min]$", "$No.\ clusters$")
 
     ylim = ax.get_ylim()

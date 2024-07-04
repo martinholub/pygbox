@@ -11,7 +11,10 @@ def detect2D(   im, radius, rel_intensity_threshold = 1,
     """ Detect objects in based on 2D information """
 
     # limit detection to a projected stack
-    im_ = ops.project(im, projection)
+    if im.ndim > 2:
+        im_ = ops.project(im, projection, ax = -1)
+    else:
+        im_ = im
     # median filter to remove speckles
     im_ = median_filter(im_, size = 3)
 
@@ -21,7 +24,6 @@ def detect2D(   im, radius, rel_intensity_threshold = 1,
 
     # minimal distance
     mindist = int(rel_min_distance * radius)
-
     # detect local minima
     spots = peak_local_max(im_, min_distance = mindist,
                 exclude_border = (radius, ) * im_.ndim,
@@ -37,19 +39,27 @@ def detect2D(   im, radius, rel_intensity_threshold = 1,
     # not needed, handeled by peak_local_max param min_distance
 
     ## sort out low intensity spots (could handle this directly in peak_local_max)
-    keep = im_[xspot, yspot] > \
-        (rel_intensity_threshold*np.mean(im_) + 2*np.std(im_))
-    xspot = xspot[keep]; yspot = yspot[keep]
+    try:
+        keep = im_[xspot, yspot] > \
+            (rel_intensity_threshold*np.nanmean(im_) + 2*np.nanstd(im_))
+        xspot = xspot[keep]; yspot = yspot[keep]
+    except IndexError as e:
+        import pdb; pdb.set_trace()
+        xspot = []; yspot = []; zspot = []
 
     ## discard spots that are too close to an edge
     # handeled in peak_local_max by exclude_border param
 
-
-    # recover z-depth by looking for maximum along z
-    zspot = ops.get_z_pos(im[:,:,:,t], (xspot, yspot), radius)
-    # Discard spots at the z-extremes:  (may not be needed)
-    tf = (zspot > (nZ - radius/2)) | (zspot < radius/2)
-    zspot = zspot[~tf]; xspot = xspot[~tf]; yspot = yspot[~tf]
+    ### DEPREC
+    if im.ndim > 2:
+        raise NotImplementedError("Passing 3D image to detect2D is not defined.")
+        # recover z-depth by looking for maximum along z
+        zspot = ops.get_z_pos(im[:,:,:,t], (xspot, yspot), radius)
+        # Discard spots at the z-extremes:  (may not be needed)
+        tf = (zspot > (nZ - radius/2)) | (zspot < radius/2)
+        zspot = zspot[~tf]; xspot = xspot[~tf]; yspot = yspot[~tf]
+    else:
+        zspot = [0]*len(xspot)
 
     return (xspot, yspot, zspot)
 

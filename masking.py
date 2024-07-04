@@ -311,8 +311,7 @@ def planar_mask(im, pix2um = (1, 1, 1)):
     """
     nX, nY, nZ = im.shape
     im_ = _preprocess(im, opt = [ 6, 4 ])
-    #im_ = im
-
+    im_ = im # MH 240704
     im_min_trhesh, thresh, snr = imthresh(im_) # get a threshold from 3D volume
 
     # this is natural but somewhat does not seem to work well
@@ -333,7 +332,7 @@ def planar_mask(im, pix2um = (1, 1, 1)):
         fgm = imiz > 0
 
         # remove tiny regions
-        fgm = binary_opening(fgm, disk(3), iterations = 2)
+        #fgm = binary_opening(fgm, disk(3), iterations = 2) # MH 240704
 
         # connect fragmented regions
         #fgm = binary_closing(fgm, diamond(5)) # 15 .. 21 works fine
@@ -374,7 +373,7 @@ def planar_mask(im, pix2um = (1, 1, 1)):
         print("planar_masking.binary_dilation: 3D Dilating with diamond")
         fgms = binary_dilation(fgms, iterations = 1)
 
-    fgms = dilate_mask_z(fgms)
+    if nZ > 1: fgms = dilate_mask_z(fgms)
 
     # Verbose inspection
     # if fgms.sum() > 0:
@@ -622,7 +621,7 @@ def threshold_model(im):
     im_out[im_out <= 0] = 0
 
     sim_to_plot = sim[np.logical_and(sim < 5*thresh_sim, sim > 0)]
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     #_plot_threshold_model_fit(sim, (fit_lo, fit_up), [(np.argmin(dist), sim[np.argmin(dist)])], thresh_sim)
     #_plot_threshold_model_fit(sim, ((x_lo, fit_lo_y), (x_up, fit_up_y)), [(np.argmin(dist), sim[np.argmin(dist)])])
 
@@ -824,7 +823,7 @@ def inspect_mask(stack, mask, spacing = (1., 1., 1.),
     mask_shape = mask.shape
     stack = [np.squeeze(np.moveaxis(s, 2, 0)) for s in stack]
     mask = np.squeeze(np.moveaxis(mask, 2, 0))
-    spacing = np.roll(np.asarray(spacing), 1)
+    spacing = np.roll(np.asarray(spacing[:mask.ndim]), 1)
 
     viewer = napari.Viewer( title = "Mask Overlay",
                             axis_labels = ['z', 'x', 'y'], show = True)
@@ -857,9 +856,12 @@ def inspect_mask(stack, mask, spacing = (1., 1., 1.),
 
 
     napari.run() # anything after this will run once the window closes
+    # may have to run this from command line!
 
     # get (updated) mask
-    mask = np.moveaxis(labels_layer.data, 0, 2)
+    mask = labels_layer.data
+    if mask.ndim == 2: mask = np.reshape(mask, (1, ) + mask.shape)
+    mask = np.moveaxis(mask, 0, 2)
 
     # TODO: find a way how to get mask from newly added layer
     mask = np.reshape(mask, mask_shape)
@@ -932,7 +934,9 @@ def get_span_ax(ex, cc, nn):
     ax_high = np.min([nn, cc + ex//2])
     # Force centering around the object
     if ax_low == 0: ax_high = np.min([ax_high, 2*cc - ax_low])
-    if ax_high == nn: ax_low = np.max([ax_low, 2*cc - ax_high])
+    #if ax_high == nn: ax_low = np.max([ax_low, 2*cc - ax_high])
+
+    if ax_high == 0: ax_high += 1
     return [int(np.around(ax_low)), int(np.around(ax_high))]
 
 def get_span_axs(exts, centr, max_spans):

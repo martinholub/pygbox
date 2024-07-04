@@ -5,9 +5,10 @@ from datetime import datetime
 
 class Image(object):
     def __init__(self, fpath):
-        self.direc, self.fname, self.ext = _parse_fpath(fpath)
+        self.direc, self.fname, self.ext = self._parse_fpath(fpath)
+        self.impath = fpath
 
-    def _parse_fpath(fpath):
+    def _parse_fpath(self, fpath):
         assert path.isfile(fpath), 'File does not exist'
 
         parent, base = path.split(fpath)

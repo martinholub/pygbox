@@ -33,7 +33,7 @@ def max_project(im, ax):
     return np.max(im, ax, keepdims = False)
 
 
-def sum_intensity(im, ax = None, mask = None, dx = None, do_bg_sub = False):
+def sum_intensity(im, mask = None, dx = None, ax = None, do_bg_sub = False):
     """ Compute sum intensity
     """
     if mask is None: # sum in whole image
@@ -71,15 +71,20 @@ def normalize(x, a = 0, b = 1):
     x = (b - a) * (x - x.min()) / (x.max() - x.min()) + a
     return x
 
-def bg_sub(im, mask):
+def bg_sub(im, mask, how = "out"):
     """ Subtract background from an image knowing foreground mask
     """
     if not im.shape == mask.shape:
         mask = np.reshape(mask, im.shape)
-    bg = im[np.logical_and(mask==0, im > .1)]
-    bg_val = np.nanmedian(bg)
-    bg_std = np.nanstd(bg)
-    print("BG median = {:.1f}; BG std = {:.3f}".format(bg_val, bg_std))
+    if how.lower() == "out":
+        bg = im[np.logical_and(mask==0, im > .1)]
+        bg_val = np.nanmedian(bg)
+        bg_std = np.nanstd(bg)
+        print("BG median = {:.1f}; BG std = {:.3f}".format(bg_val, bg_std))
+    elif how.lower() == "in":
+        bg = im[np.logical_and(mask==1, im > 0)]
+        bg_val = np.quantile(bg, .1); bg_std = 0
+        print("BG (10% quantile) = {:.1f}; BG std = {:.3f}".format(bg_val, bg_std))
     im = im - (bg_val + bg_std*2)
     im[im<0] = np.nan
     return im

@@ -46,9 +46,10 @@ def imshow(ax, x, gamma = 1, pixel_size = None, sat = 0, kwargs = {}):
     sat = sat if sat <=1 else sat/100
     vmax = 1 - sat
     # the extent will be [0, npixY, 0, npixX]
-    try:
+    if nframes == 1:
         ax.imshow(  x, vmin = 0, vmax = vmax, **kwargs_)
-    except TypeError as e:
+    else:
+    #except TypeError as e:
         for i in range(nframes):
             ax.clear()
             ax.imshow(x[:,:,i], vmin = 0, vmax = vmax, **kwargs_)
@@ -108,6 +109,9 @@ def scalebar(ax, pixel_size, length = 5, show_text = True):
 
 def spots(ax, x, y = [], kwargs = {}):
     """Overlay spots on image"""
+
+    if len(x) == 0:
+        return ax
 
     if len(y) == 0:
         y = x[:,1]

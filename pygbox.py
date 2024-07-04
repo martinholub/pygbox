@@ -351,20 +351,20 @@ class Detector(object):
         nX, nY, nZ, nT = im.shape
         objects = []
         for t in range(0, nT):
-
             if im.shape[2] == 1:
-                xspot, yspot, zspot = detection.detect2D(im,
+                xspot, yspot, zspot = detection.detect2D(im[:, :, 0, t],
                     self.radius, self.rel_intensity_threshold,
                     self.rel_min_distance, projection = 'max')
 
             else:
-                xspot, yspot, zspot = detection.detect3D(im, self.radius, pix2um, opt = 2)
+                xspot, yspot, zspot = detection.detect3D(im[:, :, :, t], self.radius, pix2um, opt = 2)
 
             ## DEBUG
-            #if self.verbose:
-                #ax = viz.imshow([], im_, gamma = 0.5, sat = 0.3, pixel_size = .19)
-                #viz.spots(ax, yspot, xspot, {'s': np.pi*self.radius**2})
-                #plots.wait()
+            if self.verbose:
+                im_ = im[:, :, 0, t]
+                ax = viz.imshow([], im_, gamma = 0.5, sat = 0.3, pixel_size = .19)
+                viz.spots(ax, yspot, xspot, {'s': np.pi*self.radius**2})
+                plots.wait()
 
             # store spots
             try:
@@ -459,10 +459,14 @@ class Segmentor(object):
         centrs = self.detector.objects
         im = self.stack.im
         # select extent to capture X um in real world coordinates
-        ext = np.round( self.ext / self.stack.pix2um ).astype(int)
+        if self.stack.pix2um[-1] > 0:
+            ext = np.round( self.ext / self.stack.pix2um ).astype(int)
+            if ext[2] % 2: ext[2] += 1
+        else:
+            ext = np.round( self.ext / self.stack.pix2um[:2] ).astype(int)
+            ext = np.append(ext, 1)
         if ext[0] % 2: ext[0] += 1
         if ext[1] % 2: ext[1] += 1
-        if ext[2] % 2: ext[2] += 1
 
         # Load object
         if self.corners:
@@ -494,13 +498,14 @@ class Segmentor(object):
             for ic, c_ in enumerate(tc): # loop over centroids
                 # crop out object of interest
                 xspan, yspan, zspan = masking.get_span_axs(ext, c_, (nX, nY, nZ))
-
+                xspan, yspan, zspan = zip((0, 0, 0), (nX, nY, nZ)) # MH
                 #xspan = [np.max([c_[0] - ext[0]//2, 0]), np.min([nX, c_[0] + ext[0]//2])]
                 #yspan = [np.max([c_[1] - ext[1]//2, 0]), np.min([nY, c_[1] + ext[1]//2])]
                 #zspan = [np.max([c_[2] - ext[2]//2, 0]), np.min([nZ, c_[2] + ext[2]//2])]
                 im_ = im[xspan[0]:xspan[1], yspan[0]:yspan[1], zspan[0]:zspan[1], t]
                 #TODO: make the check below relative to pixel_size
-                if any([x <= 6 for x in im_.shape[:3]]):
+                if any([x <= 6 for x in im_.shape[:np.sum(self.stack.pix2um > 0)]]):
+                    mask = np.zeros_like(im_)
                     continue
 
                 # Mercator mask
@@ -512,12 +517,11 @@ class Segmentor(object):
 
                 #radial mask
                 #mask = masking.radial_mask(im_, self.detector.radius, self.stack.pix2um)
-
-                # if self.verbose and mask.sum() > 0 and (ic%10 == 0):
-                #     ax = viz.imshow([], im_[..., im_.shape[2]//2], gamma = 0.5, sat = 0.3)
-                #     #ax = viz.imshow([], ops.project(im_), gamma = 0.5, sat = 0.3)
-                #     ax = viz.fgm(ax, mask[..., im_.shape[2]//2])
-                #     plots.wait()
+                if self.verbose and mask.sum() > 0 and (ic%10 == 0):
+                    ax = viz.imshow([], im_[..., im_.shape[2]//2], gamma = 0.5, sat = 0.3)
+                    ax = viz.imshow([], ops.project(im_), gamma = 0.5, sat = 0.3)
+                    ax = viz.fgm(ax, mask[..., im_.shape[2]//2])
+                    plots.wait()
 
                 #apply some 3D checks on the mask
                 #if not masking.qc_mask3D(mask): continue
@@ -527,23 +531,25 @@ class Segmentor(object):
                 #threshs.append(thresh); snrs.append(snr)
 
             # store info at highest level
+            if len(masks) == 0: masks = [np.zeros((nX, nY, nZ), dtype = np.bool)]
             masks_all.append(masks); spans_all.append(spans); # ims_all.append(ims)
             #threshs_all.append(threshs); snrs_all.append(snrs)
 
         self.corners = spans_all; #self.masks = masks_all; # self.crops = ims_all
         #self.threshs = threshs_all; self.snrs = snrs_all
+        #masks_all = self.register_masks(masks_all) #MH240704
+        # should work with a single mask per frame
+        masks_all = np.stack([x[0] for x in masks_all], -1)
 
-        masks_all = self.register_masks(masks_all)
-
-        if self.verbose:
-            for t in range(masks_all.shape[3]):
-                labels_old = np.unique(masks_all[..., t])
-                new_mask = masking.inspect_mask(im[..., t], masks_all[..., t], self.stack.pix2um)
-                labels_new = np.unique(new_mask)
-                if not np.in1d(labels_new, labels_old).all():
-                    masks_all[..., t] = new_mask
-                    self.corners[t] = masking.recenter_corners(masks_all[..., t],
-                                        ext, (nX, nY, nZ))
+        # if self.verbose:
+        #     for t in range(masks_all.shape[3]):
+        #         labels_old = np.unique(masks_all[..., t])
+        #         new_mask = masking.inspect_mask(im[..., t], masks_all[..., t], self.stack.pix2um)
+        #         labels_new = np.unique(new_mask)
+        #         if not np.in1d(labels_new, labels_old).all():
+        #             masks_all[..., t] = new_mask
+        #             self.corners[t] = masking.recenter_corners(masks_all[..., t],
+        #                                 ext, (nX, nY, nZ))
 
         self.mask = masks_all
         self.save()
@@ -850,14 +856,19 @@ class Quantifier(object):
             kwargs.update({'dx': self.segmentor.stack.pix2um})
 
             results = {str(it):{str(ic):{} for icc in icrop for ic in icc} for it in itime}
-
             axspans = []
             for it in list(results.keys()):
                 axspans_it = []
                 for i, ic in enumerate(list(results[str(it)].keys())):
                     if not results[str(it)][str(ic)]: #MH: Why is there this IF?
-                        fgm_, _ = self.segmentor.fetch_mask(i, int(it))
-                        im_bg, axspan = self.segmentor.fetch_crop(i, int(it))
+
+                        # MH240704
+                        #fgm_, _ = self.segmentor.fetch_mask(i, int(it))
+                        #im_bg, axspan = self.segmentor.fetch_crop(i, int(it))
+                        fgm_ = self.segmentor.mask[:, :, int(ic), int(it)]
+                        im_bg = self.segmentor.stack.im[:, :, int(ic), int(it)]
+                        
+                        axspan = zip((0, 0, 0), im_bg.shape + (1, ))
                         im_, thresh, snr = self.get_threshold(im_bg)
                         axspans_it.append(axspan)
 
@@ -889,7 +900,8 @@ class Quantifier(object):
                 axspans.append(axspans_it)
 
         for it in list(results.keys()):
-            dfres = {   'id': np.array([int(x) + 1 for x in results[str(it)].keys()]),
+            dfres = {   #'id': np.array([int(x) + 1 for x in results[str(it)].keys()]),
+                        'id': np.array([int(x) + 1 for x in results.keys()]),
                         # bookkeep index -1 shift from earlier -.-
                         'qc': self.parse_result(        descriptor = 'qc',
                                                         value = None, result = results),
