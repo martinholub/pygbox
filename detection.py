@@ -1,10 +1,15 @@
-from pygbox import ops
 from skimage.feature import peak_local_max
 from skimage.morphology import remove_small_objects
 from scipy.ndimage import median_filter, maximum_filter, measurements, label
 import numpy as np
-from pygbox.masking import threshold_model
 import napari
+
+try:
+    from pygbox import ops
+    from pygbox.masking import threshold_model
+except ImportError as e:
+    import ops
+    from masking import threshold_model
 
 def detect2D(   im, radius, rel_intensity_threshold = 1,
                 rel_min_distance = 2.5, projection = 'max'):

@@ -1,9 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from pygbox import ops
 import seaborn as sns
 import itertools
+
+try:
+    from pygbox import ops
+except ImportError as e:
+    import ops
 
 def set_plot_style(pltstyle = 'seaborn-paper', kwargs = {}):
     plt.style.use(pltstyle)

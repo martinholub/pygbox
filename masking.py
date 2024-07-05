@@ -21,9 +21,14 @@ from scipy.interpolate import RegularGridInterpolator, RBFInterpolator
 from scipy.stats import trim_mean, multivariate_normal
 from scipy.signal import savgol_filter
 
-from pygbox import viz
-from pygbox.viz.cm import gnuplot as Gnuplot
-from pygbox.ops import radius_of_gyration, aniso_points, aniso_mesh, normalize, polar2cart, cart2polar
+try:
+    from pygbox import viz
+    from pygbox.viz.cm import gnuplot as Gnuplot
+    from pygbox.ops import radius_of_gyration, aniso_points, aniso_mesh, normalize, polar2cart, cart2polar
+except ImportError as e:
+    import viz
+    from viz.cm import gnuplot as Gnuplot
+    from ops import radius_of_gyration, aniso_points, aniso_mesh, normalize, polar2cart, cart2polar
 
 def _preprocess(im, opt = 1, args = {}):
     """Preprocess image for masking and visualization
@@ -310,8 +315,8 @@ def planar_mask(im, pix2um = (1, 1, 1)):
 
     """
     nX, nY, nZ = im.shape
-    im_ = _preprocess(im, opt = [ 6, 4 ])
-    im_ = im # MH 240704
+    im_ = _preprocess(im, opt = [6])
+    #im_ = im # MH 240704
     im_min_trhesh, thresh, snr = imthresh(im_) # get a threshold from 3D volume
 
     # this is natural but somewhat does not seem to work well
@@ -332,7 +337,7 @@ def planar_mask(im, pix2um = (1, 1, 1)):
         fgm = imiz > 0
 
         # remove tiny regions
-        #fgm = binary_opening(fgm, disk(3), iterations = 2) # MH 240704
+        fgm = binary_opening(fgm, disk(3), iterations = 1) # MH 240704
 
         # connect fragmented regions
         #fgm = binary_closing(fgm, diamond(5)) # 15 .. 21 works fine

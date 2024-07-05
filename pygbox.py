@@ -9,13 +9,22 @@ from tqdm.auto import tqdm
 import pandas as pd
 from pathlib import Path
 
-from pygbox.fio.meta import load_metadata as loadmeta
-from pygbox.fio.meta import dump_json, load_json
-from pygbox.fio import tiff
-from pygbox.utils.utils import TQDM, tqdm_params
-from pygbox import ops, masking
-from pygbox.viz import viz, plots
-from pygbox import detection
+try:
+    from pygbox.fio.meta import load_metadata as loadmeta
+    from pygbox.fio.meta import dump_json, load_json
+    from pygbox.fio import tiff
+    from pygbox.utils.utils import TQDM, tqdm_params
+    from pygbox import ops, masking
+    from pygbox.viz import viz, plots
+    from pygbox import detection
+except ModuleNotFoundError as e:
+    from fio.meta import load_metadata as loadmeta
+    from fio.meta import dump_json, load_json
+    from fio import tiff
+    from utils.utils import TQDM, tqdm_params
+    from viz import viz, plots
+    import ops, masking, detection
+
 
 # TODO: uneven illumination correction
 
@@ -100,11 +109,15 @@ class StackContainer(object):
         tqdm_params.update(tqdm_params_)
 
         with tqdm(**tqdm_params) as pbar: # progbar
-            for f in self.fpaths:
+            for i, f in enumerate(self.fpaths):
                 pbar.update(1)
-                fname = pth.splitext(pth.split(f)[-1])[0]
-                s = Stack(fpath = f, pix2um = self.pix2um)
-                s.load()
+
+                if isinstance(f, (Stack, )):
+                    s = f
+                else:
+                    fname = pth.splitext(pth.split(f)[-1])[0]
+                    s = Stack(fpath = f, pix2um = self.pix2um)
+                    s.load()
 
                 d = Detector(**kwargs_['Detector'])
                 d.detect(s, pix2um = self.pix2um)
@@ -115,7 +128,7 @@ class StackContainer(object):
                 q = Quantifier(sg, **kwargs_['Quantifier'])
                 q.quantify()
 
-                self.results[fname] = q.results
+                self.results[str(i)] = q.results
                 del s, d, sg, q
                 #return d, sg, q
 
@@ -324,7 +337,9 @@ class Detector(object):
                                         self.objects[it], self.radius, pix2um)
 
                             if len(self.objects[it]) == len(coords):
-                                if (self.objects[it] == coords).all():
+                                if len(coords) == 0:
+                                    continue
+                                elif (self.objects[it] == coords).all():
                                     continue
                             else:
                                 self.objects[it] = coords
@@ -360,11 +375,11 @@ class Detector(object):
                 xspot, yspot, zspot = detection.detect3D(im[:, :, :, t], self.radius, pix2um, opt = 2)
 
             ## DEBUG
-            if self.verbose:
-                im_ = im[:, :, 0, t]
-                ax = viz.imshow([], im_, gamma = 0.5, sat = 0.3, pixel_size = .19)
-                viz.spots(ax, yspot, xspot, {'s': np.pi*self.radius**2})
-                plots.wait()
+            # if self.verbose:
+            #     im_ = im[:, :, 0, t]
+            #     ax = viz.imshow([], im_, gamma = 0.5, sat = 0.3, pixel_size = .19)
+            #     viz.spots(ax, yspot, xspot, {'s': np.pi*self.radius**2})
+            #     plots.wait()
 
             # store spots
             try:
@@ -377,8 +392,13 @@ class Detector(object):
             self.save(fpath)
 
     def save(self, fpath):
-        fpath = pth.splitext(fpath)[0]
-        fpath = fpath + "_" + type(self).__name__
+        if not fpath:
+            fpath = make_fpath(
+                self.stack.fpath, "+_" + type(self).__name__, ".npy",
+                append_date = False)
+        else:
+            fpath = pth.splitext(fpath)[0]
+            fpath = fpath + "_" + type(self).__name__
         np.save(fpath, self.objects)
 
     def load(self, fpath = ""):
@@ -386,8 +406,9 @@ class Detector(object):
             fpath = self.stack.im.fpath
             fpath = pth.splitext(fpath)[0]
             fpath = glob(fpath + "*" + type(self).__name__ + "*")[0]
-        objects = np.load(fpath) # this will be [t, N, 3] shapped array
-        self.objects = [x.tolist() for x in objects] # lists of len [N] for each [t]
+        objects = np.load(fpath, allow_pickle = True) # this will be [t, N, 3] shapped array
+        #self.objects = [x.tolist() for x in objects] # lists of len [N] for each [t]
+        self.objects = objects #MH240705
 
 
 class Tracker(object):
@@ -458,6 +479,7 @@ class Segmentor(object):
         # Fetch data to analyze
         centrs = self.detector.objects
         im = self.stack.im
+        nX, nY, nZ, nT = im.shape
         # select extent to capture X um in real world coordinates
         if self.stack.pix2um[-1] > 0:
             ext = np.round( self.ext / self.stack.pix2um ).astype(int)
@@ -467,28 +489,31 @@ class Segmentor(object):
             ext = np.append(ext, 1)
         if ext[0] % 2: ext[0] += 1
         if ext[1] % 2: ext[1] += 1
-
         # Load object
         if self.corners:
+
             fpath = Path(self.corners)
             if fpath.is_file():
                 try:
                     self.load(fpath) # assings self.corners, self.mask
                     if self.verbose:
                         # repilcate code from bottom of this function
-                        for t in range(new_mask.shape[3]):
+                        for t in range(self.mask.shape[3]):
+
                             labels_old = np.unique(self.mask[..., t])
                             new_mask = masking.inspect_mask(im[..., t], self.mask[..., t], self.stack.pix2um)
                             labels_new = np.unique(new_mask)
-                            if not np.in1d(labels_new, labels_old).all():
+
+                            if not (new_mask.sum() == self.mask[..., t].sum()):
                                 self.mask[..., t] = new_mask
-                                self.corners[t] = masking.recenter_corners(self.mask[..., t],
-                                                    ext, (nX, nY, nZ))
-                        self.save()
+                                #corners deprec for now
+                                # self.corners[t] = masking.recenter_corners(self.mask[..., t],
+                                #                     ext, (nX, nY, nZ))
+                                self.save(fpath)
                     return
                 except Exception as e:
                     pass
-
+        import pdb; pdb.set_trace()
         # loop over object centroids
         masks_all = []; ims_all = []; spans_all = []; threshs_all = []; snrs_all = [];
         nX, nY, nZ, nT = im.shape
@@ -497,6 +522,7 @@ class Segmentor(object):
             masks = []; ims = []; spans = []; threshs = []; snrs = []
             for ic, c_ in enumerate(tc): # loop over centroids
                 # crop out object of interest
+
                 xspan, yspan, zspan = masking.get_span_axs(ext, c_, (nX, nY, nZ))
                 xspan, yspan, zspan = zip((0, 0, 0), (nX, nY, nZ)) # MH
                 #xspan = [np.max([c_[0] - ext[0]//2, 0]), np.min([nX, c_[0] + ext[0]//2])]
@@ -504,9 +530,9 @@ class Segmentor(object):
                 #zspan = [np.max([c_[2] - ext[2]//2, 0]), np.min([nZ, c_[2] + ext[2]//2])]
                 im_ = im[xspan[0]:xspan[1], yspan[0]:yspan[1], zspan[0]:zspan[1], t]
                 #TODO: make the check below relative to pixel_size
-                if any([x <= 6 for x in im_.shape[:np.sum(self.stack.pix2um > 0)]]):
-                    mask = np.zeros_like(im_)
-                    continue
+                # if any([x <= 6 for x in im_.shape[:np.sum(self.stack.pix2um > 0)]]):
+                #     mask = np.zeros_like(im_)
+                #     continue
 
                 # Mercator mask
                 # mask = masking.mercator_mask(im_, self.pix2um)
@@ -517,11 +543,13 @@ class Segmentor(object):
 
                 #radial mask
                 #mask = masking.radial_mask(im_, self.detector.radius, self.stack.pix2um)
-                if self.verbose and mask.sum() > 0 and (ic%10 == 0):
-                    ax = viz.imshow([], im_[..., im_.shape[2]//2], gamma = 0.5, sat = 0.3)
-                    ax = viz.imshow([], ops.project(im_), gamma = 0.5, sat = 0.3)
-                    ax = viz.fgm(ax, mask[..., im_.shape[2]//2])
-                    plots.wait()
+
+                ## DEBUG
+                # if self.verbose and mask.sum() > 0 and (ic%10 == 0):
+                #     ax = viz.imshow([], im_[..., im_.shape[2]//2], gamma = 0.5, sat = 0.3)
+                #     ax = viz.imshow([], ops.project(im_), gamma = 0.5, sat = 0.3)
+                #     ax = viz.fgm(ax, mask[..., im_.shape[2]//2])
+                #     plots.wait()
 
                 #apply some 3D checks on the mask
                 #if not masking.qc_mask3D(mask): continue
@@ -550,7 +578,6 @@ class Segmentor(object):
         #             masks_all[..., t] = new_mask
         #             self.corners[t] = masking.recenter_corners(masks_all[..., t],
         #                                 ext, (nX, nY, nZ))
-
         self.mask = masks_all
         self.save()
 
@@ -785,7 +812,7 @@ class Segmentor(object):
             fpath = self.stack.fpath
             fpath = pth.splitext(fpath)[0]
             fpath = glob(fpath + "*" + type(self).__name__ + "*")[0]
-        segdict = np.load(fpath)
+        segdict = np.load(fpath, allow_pickle = True)
         self.corners = segdict['corners']; self.mask = segdict['mask']
 
 class Quantifier(object):
@@ -867,7 +894,7 @@ class Quantifier(object):
                         #im_bg, axspan = self.segmentor.fetch_crop(i, int(it))
                         fgm_ = self.segmentor.mask[:, :, int(ic), int(it)]
                         im_bg = self.segmentor.stack.im[:, :, int(ic), int(it)]
-                        
+
                         axspan = zip((0, 0, 0), im_bg.shape + (1, ))
                         im_, thresh, snr = self.get_threshold(im_bg)
                         axspans_it.append(axspan)

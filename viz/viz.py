@@ -1,10 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from pygbox import ops
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import matplotlib.font_manager as fm
 from os import path
 import napari
+try:
+    from pygbox import ops
+except ImportError as e:
+    import ops
 
 def _show():
     plt.show()
