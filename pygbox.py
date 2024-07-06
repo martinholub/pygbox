@@ -513,7 +513,6 @@ class Segmentor(object):
                     return
                 except Exception as e:
                     pass
-        import pdb; pdb.set_trace()
         # loop over object centroids
         masks_all = []; ims_all = []; spans_all = []; threshs_all = []; snrs_all = [];
         nX, nY, nZ, nT = im.shape
@@ -881,21 +880,20 @@ class Quantifier(object):
             if isinstance(descriptors, (tuple, )): descriptors = list(descriptors)
 
             kwargs.update({'dx': self.segmentor.stack.pix2um})
-
             results = {str(it):{str(ic):{} for icc in icrop for ic in icc} for it in itime}
             axspans = []
             for it in list(results.keys()):
                 axspans_it = []
                 for i, ic in enumerate(list(results[str(it)].keys())):
-                    if not results[str(it)][str(ic)]: #MH: Why is there this IF?
+                    if not results[str(it)][str(ic)]: #Seems superfluous
 
                         # MH240704
                         #fgm_, _ = self.segmentor.fetch_mask(i, int(it))
                         #im_bg, axspan = self.segmentor.fetch_crop(i, int(it))
-                        fgm_ = self.segmentor.mask[:, :, int(ic), int(it)]
-                        im_bg = self.segmentor.stack.im[:, :, int(ic), int(it)]
+                        fgm_ = self.segmentor.mask[..., int(it)]
+                        im_bg = self.segmentor.stack.im[..., int(it)]
 
-                        axspan = zip((0, 0, 0), im_bg.shape + (1, ))
+                        axspan = [*zip((0, 0, 0), im_bg.shape + (1, ))]
                         im_, thresh, snr = self.get_threshold(im_bg)
                         axspans_it.append(axspan)
 
