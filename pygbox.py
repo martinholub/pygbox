@@ -565,6 +565,7 @@ class Segmentor(object):
         self.corners = spans_all; #self.masks = masks_all; # self.crops = ims_all
         #self.threshs = threshs_all; self.snrs = snrs_all
         #masks_all = self.register_masks(masks_all) #MH240704
+
         # should work with a single mask per frame
         masks_all = np.stack([x[0] for x in masks_all], -1)
 

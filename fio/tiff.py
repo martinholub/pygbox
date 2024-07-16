@@ -41,7 +41,7 @@ def reshape(ims, nZ = 1, nT = 1):
     ims = ims[0] if len(ims) == 1 else ims
     return ims
 
-def load(impath):
+def load(impath, order = "TZ"):
     """
     loads tiff from impath
     It reads in the order TZYX
@@ -52,12 +52,15 @@ def load(impath):
         assert path.isfile(imp), "Supply correct image path."
         with tifffile.TiffFile(imp) as tif:
             imstack = tif.asarray()
-            #imstack = np.swapaxes(imstack, -1, -2) # ..YX to ..XY
             imstack = np.moveaxis(imstack, 0, -1) # ..XY to XY..
+
             # make sure image has always four dimensions
             shape = imstack.shape
             shape = shape + (1, ) * (4 - len(shape))
             imstack = np.reshape(imstack, shape)
+            # move time axis to expected position
+            if order.lower() == "zt":
+                imstack = np.swapaxes(imstack, -1, -2) # ..TZ to ..ZT
             imstacks.append(imstack)
     imstacks = imstacks[0] if len(imstacks) == 1 else imstacks
     return imstacks
