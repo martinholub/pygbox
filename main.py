@@ -48,7 +48,7 @@ def pipeline(args):
 
         # create Stack object
         try:
-            sc = Stack(im = ims[0][..., 0:10], fpath = fpath[0], pix2um = pix2um)
+            sc = Stack(im = ims[0], fpath = fpath[0], pix2um = pix2um)
         except IndexError as e:
             import pdb; pdb.set_trace() # figure out what went wrong
 
@@ -64,8 +64,8 @@ def pipeline(args):
                 },
                 'Segmentor': {
                     'ext': 30, # in um
-                    'corners': glob(make_fpath(fpath[0], "+_Segmentor*", ".*", append_date = False)).pop(),
-                    #'corners': [],
+                    #'corners': glob(make_fpath(fpath[0], "+_Segmentor*", ".*", append_date = False)).pop(),
+                    'corners': [],
                     'verbose': True,
                     },
                 'Quantifier': {

@@ -566,8 +566,11 @@ class Segmentor(object):
         #self.threshs = threshs_all; self.snrs = snrs_all
         #masks_all = self.register_masks(masks_all) #MH240704
 
-        # should work with a single mask per frame
+        # should work also with a single mask per frame
         masks_all = np.stack([x[0] for x in masks_all], -1)
+
+        # sum mask across all time
+        masks_all[..., :] = np.sum(masks_all, -1, keepdims = True) > 0
 
         # if self.verbose:
         #     for t in range(masks_all.shape[3]):
