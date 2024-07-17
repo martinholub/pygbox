@@ -36,8 +36,6 @@ def pipeline(args):
     pix2um = (.118, .118, 1.0)
     processedid = 0
 
-
-
     for i, fpaths in enumerate(allfpaths):
         ims = []
         # Load planes from valid paths
@@ -66,14 +64,14 @@ def pipeline(args):
                 },
                 'Segmentor': {
                     'ext': 30, # in um
-                    #'corners': glob(make_fpath(fpath[0], "+_Segmentor*", ".*", append_date = False)).pop(),
-                    'corners': [],
-                    'verbose': False,
+                    'corners': glob(make_fpath(fpath[0], "+_Segmentor*", ".*", append_date = False)).pop(),
+                    #'corners': [],
+                    'verbose': True,
                     },
                 'Quantifier': {
                     #'results': glob(make_fpath(f, "+_Quantifier*", ".*", append_date = False)).pop(),
                     'results': {},
-                    'verbose': True,
+                    'verbose': False,
                     }
         })
         processedid += 1

@@ -822,16 +822,19 @@ def inspect_mask(stack, mask, spacing = (1., 1., 1.),
         -Pass Z-axis at 3rd position, it will be rolled to the beginning
 
     """
-
     if not isinstance(stack, (tuple, list)): stack = [stack]
     # confirm/edit spots with napari
     mask_shape = mask.shape
-    stack = [np.squeeze(np.moveaxis(s, 2, 0)) for s in stack]
-    mask = np.squeeze(np.moveaxis(mask, 2, 0))
-    spacing = np.roll(np.asarray(spacing[:mask.ndim]), 1)
+    #stack = [np.squeeze(np.moveaxis(s, (2, 3), (1, 0))) for s in stack]
+    #mask = np.squeeze(np.moveaxis(mask, (2, 3), (1, 0)))
+    stack = [np.moveaxis(s, (2, 3), (1, 0)) for s in stack]
+    mask = np.moveaxis(mask, (2, 3), (1, 0))
+
+    if len(spacing) < 4: spacing = np.append(spacing, (1, )*(4 - len(spacing)))
+    spacing = np.roll(spacing, 2); spacing[:2] = spacing[:2][::-1]
 
     viewer = napari.Viewer( title = "Mask Overlay",
-                            axis_labels = ['z', 'x', 'y'], show = True)
+                            axis_labels = ['t', 'z', 'x', 'y'], show = True)
 
     cmaps = ['viridis', Gnuplot, 'magma']
     for stk, cmap in zip(stack, cmaps):

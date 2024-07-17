@@ -491,25 +491,25 @@ class Segmentor(object):
         if ext[1] % 2: ext[1] += 1
         # Load object
         if self.corners:
-
             fpath = Path(self.corners)
             if fpath.is_file():
                 try:
                     self.load(fpath) # assings self.corners, self.mask
                     if self.verbose:
                         # repilcate code from bottom of this function
-                        for t in range(self.mask.shape[3]):
+                        # for t in range(self.mask.shape[3]):
+                        #     labels_old = np.unique(self.mask[..., t])
+                        #     new_mask = masking.inspect_mask(im[..., t], self.mask[..., t], self.stack.pix2um)
+                        #     labels_new = np.unique(new_mask)
+                        #
+                        #     if not (new_mask.sum() == self.mask[..., t].sum()):
+                        #         self.mask[..., t] = new_mask
 
-                            labels_old = np.unique(self.mask[..., t])
-                            new_mask = masking.inspect_mask(im[..., t], self.mask[..., t], self.stack.pix2um)
-                            labels_new = np.unique(new_mask)
+                        new_mask = masking.inspect_mask(im, self.mask, self.stack.pix2um)
+                        if not (new_mask.sum() == self.mask.sum()):
+                            self.mask = new_mask
+                            self.save(fpath)
 
-                            if not (new_mask.sum() == self.mask[..., t].sum()):
-                                self.mask[..., t] = new_mask
-                                #corners deprec for now
-                                # self.corners[t] = masking.recenter_corners(self.mask[..., t],
-                                #                     ext, (nX, nY, nZ))
-                                self.save(fpath)
                     return
                 except Exception as e:
                     pass
@@ -578,6 +578,10 @@ class Segmentor(object):
         #             masks_all[..., t] = new_mask
         #             self.corners[t] = masking.recenter_corners(masks_all[..., t],
         #                                 ext, (nX, nY, nZ))
+
+        if self.verbose:
+            new_mask = masking.inspect_mask(im, masks_all, self.stack.pix2um)
+
         self.mask = masks_all
         self.save()
 
