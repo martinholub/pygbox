@@ -1,6 +1,6 @@
 from os import path as pth
 from scipy.ndimage import median_filter, gaussian_laplace
-from skimage.measure import regionprops
+from skimage.measure import regionprops, label
 import json
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +8,8 @@ from glob import glob
 from tqdm.auto import tqdm
 import pandas as pd
 from pathlib import Path
+from itertools import groupby
+from copy import deepcopy
 
 try:
     from pygbox.fio.meta import load_metadata as loadmeta
@@ -332,18 +334,15 @@ class Detector(object):
                     self.load(fpath) # assings self.objects
                     do_save = 0
                     if self.verbose:
-                        for it in range(len(self.objects)):
-                            coords = detection.inspect_spots(im.im[..., it],
-                                        self.objects[it], self.radius, pix2um)
-
-                            if len(self.objects[it]) == len(coords):
-                                if len(coords) == 0:
-                                    continue
-                                elif (self.objects[it] == coords).all():
-                                    continue
+                        objects = detection.inspect_spots(im.im, self.objects, self.radius, pix2um)
+                        if len(self.objects) == len(objects):
+                            if np.all([(x == y).all() for x,y in zip(self.objects, objects)]):
+                                pass
                             else:
-                                self.objects[it] = coords
-                                do_save = 1
+                                self.objects = objects; do_save = 1
+                        else:
+                            self.objects = objects; do_save = 1
+
                     if do_save:
                         self.save(fpath) # save changes if any made
                         do_save = 0
@@ -371,8 +370,18 @@ class Detector(object):
                     self.radius, self.rel_intensity_threshold,
                     self.rel_min_distance, projection = 'max')
 
+
             else:
-                xspot, yspot, zspot = detection.detect3D(im[:, :, :, t], self.radius, pix2um, opt = 2)
+                xspot, yspot, zspot = detection.detect3D(
+                    im[:, :, :, t], self.radius, pix2um, opt = 2,
+                    rel_min_distance = self.rel_min_distance,
+                    rel_intensity_threshold = self.rel_intensity_threshold)
+
+            #if len(xspot) == 0: xspot, yspot, zspot = (np.asarray([np.nan]), )*3
+            coords = np.hstack( (xspot, yspot, zspot,
+                                np.ones_like(zspot, dtype = np.int)*t))
+            objects.append(coords)
+
 
             ## DEBUG
             # if self.verbose:
@@ -382,10 +391,15 @@ class Detector(object):
             #     plots.wait()
 
             # store spots
-            try:
-                objects.append([(x,y,z) for x,y,z in zip(xspot, yspot, zspot)])
-            except Exception as e:
-                objects.append(([], [], []))
+            # try:
+            #     objects.append([(x,y,z) for x,y,z in zip(xspot, yspot, zspot)])
+            # except Exception as e:
+            #     objects.append(([], [], []))
+
+        objects = [o for o in objects if len(o) > 0]
+        if self.verbose:
+        # manually confirm spots
+            objects = detection.inspect_spots(im, objects, self.radius, pix2um)
 
         self.objects = objects
         if do_save:
@@ -406,7 +420,7 @@ class Detector(object):
             fpath = self.stack.im.fpath
             fpath = pth.splitext(fpath)[0]
             fpath = glob(fpath + "*" + type(self).__name__ + "*")[0]
-        objects = np.load(fpath, allow_pickle = True) # this will be [t, N, 3] shapped array
+        objects = np.load(fpath, allow_pickle = True).tolist()
         #self.objects = [x.tolist() for x in objects] # lists of len [N] for each [t]
         self.objects = objects #MH240705
 
@@ -476,8 +490,6 @@ class Segmentor(object):
             corners (list): per object per time nested list of crop corners
         """
 
-        # Fetch data to analyze
-        centrs = self.detector.objects
         im = self.stack.im
         nX, nY, nZ, nT = im.shape
         # select extent to capture X um in real world coordinates
@@ -489,6 +501,7 @@ class Segmentor(object):
             ext = np.append(ext, 1)
         if ext[0] % 2: ext[0] += 1
         if ext[1] % 2: ext[1] += 1
+
         # Load object
         if self.corners:
             fpath = Path(self.corners)
@@ -513,15 +526,25 @@ class Segmentor(object):
                     return
                 except Exception as e:
                     pass
+
+        # Fetch data to analyze
+        centrs = self.detector.objects
+        # sort and group found spots
+        idx = [o[-1] for o in centrs]
+        idx, centrs = zip(*sorted(zip(idx, centrs)))
+        #np.where(~np.isin(np.arange(100), idx)) # could do this
+        centrs = [list(v) for k, v in groupby(centrs, key = lambda x: x[-1])]
         # loop over object centroids
-        masks_all = []; ims_all = []; spans_all = []; threshs_all = []; snrs_all = [];
+        masks_all_list = []; ims_all = []; spans_all = []; threshs_all = []; snrs_all = [];
         nX, nY, nZ, nT = im.shape
-        assert len(centrs) == nT, "Time-dimension mismatch between detection and masking."
-        for t, tc in enumerate(centrs): # loop over time-points
+        masks_all = np.zeros((nX, nY, nZ, nT), dtype = np.bool)
+
+        for itc, tc in enumerate(centrs): # loop over time-points
             masks = []; ims = []; spans = []; threshs = []; snrs = []
             for ic, c_ in enumerate(tc): # loop over centroids
+                t = int(c_[-1])
+                #MH 240719 - at the moment works only with 1 spot per frame
                 # crop out object of interest
-
                 xspan, yspan, zspan = masking.get_span_axs(ext, c_, (nX, nY, nZ))
                 xspan, yspan, zspan = zip((0, 0, 0), (nX, nY, nZ)) # MH
                 #xspan = [np.max([c_[0] - ext[0]//2, 0]), np.min([nX, c_[0] + ext[0]//2])]
@@ -558,8 +581,21 @@ class Segmentor(object):
                 #threshs.append(thresh); snrs.append(snr)
 
             # store info at highest level
-            if len(masks) == 0: masks = [np.zeros((nX, nY, nZ), dtype = np.bool)]
-            masks_all.append(masks); spans_all.append(spans); # ims_all.append(ims)
+
+            if len(masks) == 0:
+                masks = [np.zeros((nX, nY, nZ), dtype = np.bool)]
+            elif len(masks) > 1:
+                #raise NotImplementedError
+                # MH though this would work, can try later
+                mask = np.zeros_like(masks[0],  dtype = np.int)
+                for i, mm in enumerate(masks):
+                    mm = mm.astype(np.int)
+                    mm[mm>0] = i+1 #asign label in thos mask
+                    mask += mm #assign label in mask of masks
+                masks = [mask]
+
+            masks_all_list.append(masks); spans_all.append(spans); # ims_all.append(ims)
+            masks_all[:, :, :, t] = masks[0]
             #threshs_all.append(threshs); snrs_all.append(snrs)
 
         self.corners = spans_all; #self.masks = masks_all; # self.crops = ims_all
@@ -567,10 +603,11 @@ class Segmentor(object):
         #masks_all = self.register_masks(masks_all) #MH240704
 
         # should work also with a single mask per frame
-        masks_all = np.stack([x[0] for x in masks_all], -1)
+        #masks_all = np.stack([x[0] for x in masks_all], -1)
 
-        # sum mask across all time
-        masks_all[..., :] = np.sum(masks_all, -1, keepdims = True) > 0
+        # asign masks value across time using some smart heuristic
+        #masks_all[..., :] = np.quantile(masks_all.astype(int),
+        #                                q = .5, axis = -1, keepdims = True) > .5
 
         # if self.verbose:
         #     for t in range(masks_all.shape[3]):

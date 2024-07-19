@@ -116,11 +116,13 @@ def detect3D(im, radius, pix2um, opt = 1,
         raise NotImplementedError
 
     # manually confirm spots
-    coords_ = inspect_spots(imf, coords, radius, pix2um)
-
-    xspot, yspot, zspot = (coords_[:, 0], coords_[:, 1], coords_[:, 2])
+    xspot, yspot, zspot = (coords[:, 0], coords[:, 1], coords[:, 2])
     return (xspot, yspot, zspot)
 
+def rollnflip(x, ax = None):
+    x = np.roll(x, 2, ax)
+    x[:2] = x[:2][::-1]
+    return x
 
 def inspect_spots(stack, coords, radius = 20, spacing = (1., 1., 1.)):
     """ Edit spots interactively
@@ -128,19 +130,31 @@ def inspect_spots(stack, coords, radius = 20, spacing = (1., 1., 1.)):
     Notes:
         - on '~\Downloads\data\dev\pyth\*before*.tif' produces perfect detection
     """
-    stack = np.squeeze(np.moveaxis(stack, 2, 0))
-    coords = np.asarray([np.roll(np.round(x[:3]).astype(int), 1) for x in coords])
-    spacing = np.roll(np.asarray(spacing), 1)
+    #stack = np.squeeze(np.moveaxis(stack, 2, 0))
+    stack = np.moveaxis(stack, (2, 3), (1, 0))
+
+    #coords = np.asarray([np.roll(np.round(x[:3]).astype(int), 1) for x in coords])
+    coords = [rollnflip(x) for x in coords]
+    coords = np.array(coords)
+    #corods = np.ma.masked_where(np.isnan(coords), coords)
+
+
+    #spacing = np.roll(np.asarray(spacing), 1)
+    # add time dimension to spacing, keeping the value small
+    if len(spacing) < 4: spacing = np.append(spacing, (.01, )*(4 - len(spacing)))
+    spacing = np.roll(spacing, 2); spacing[:2] = spacing[:2][::-1]
 
     viewer = napari.Viewer( title = "Spot Overlay",
-                            axis_labels = ['z', 'x', 'y'], show = True)
+                            axis_labels = ['t', 'z', 'x', 'y'], show = True)
     image = viewer.add_image(stack, scale = spacing, gamma = 0.5)
     points_layer = viewer.add_points(coords, size = radius,
                     face_color = 'magenta', edge_color = 'magenta',
-                    scale = spacing, opacity = 0.5, n_dimensional = True)
+                    scale = spacing, opacity = 0.5, n_dimensional = None)
+    points_layer.out_of_slice_display = False
+    if stack.shape[1] > 1: viewer.dims.ndisplay = 3
 
     napari.run() # anything after this will run once the window closes
     # get points, if you made any changes this will be reflected
-    coords_ = np.roll(np.round(points_layer.data).astype(int), 2, axis = 1)
-
+    coords_ = points_layer.data.astype(int)
+    coords_ = [np.concatenate((x[2:], x[:2][::-1])) for x in coords_]
     return coords_

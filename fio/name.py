@@ -1,5 +1,6 @@
 from os import path as pth
 from time import strftime
+from glob import glob
 
 def make_fpath( head, tail = None, ext = None, append_date = True):
 
@@ -25,3 +26,9 @@ def make_fpath( head, tail = None, ext = None, append_date = True):
     if pth.isfile(fpath):
         print(fpath + ": Warning:File already exists!")
     return fpath
+
+def get_fpath(head, tail, ext, append_date = False):
+    try:
+        return glob(make_fpath(head, tail, ext, append_date = False)).pop()
+    except IndexError as e:
+        return []
