@@ -20,6 +20,7 @@ def detect2D(   im, radius, rel_intensity_threshold = 1,
         im_ = ops.project(im, projection, ax = -1)
     else:
         im_ = im
+    im_ = np.ma.masked_where(im_ == 0, im_)
     # median filter to remove speckles
     im_ = median_filter(im_, size = 3)
 
@@ -31,10 +32,8 @@ def detect2D(   im, radius, rel_intensity_threshold = 1,
     mindist = int(rel_min_distance * radius)
     # detect local minima
     spots = peak_local_max(im_, min_distance = mindist,
-                exclude_border = (radius, ) * im_.ndim,
-                indices = True)
+                exclude_border = (radius/2, ) * im_.ndim)
     xspot, yspot = (spots[:, 0], spots[:, 1])
-
     ## TODO?: blob finding at different scales
 
     ## exclude points that are too close from previously slected ones
@@ -46,7 +45,8 @@ def detect2D(   im, radius, rel_intensity_threshold = 1,
     ## sort out low intensity spots (could handle this directly in peak_local_max)
     try:
         keep = im_[xspot, yspot] > \
-            (rel_intensity_threshold*np.nanmean(im_) + 2*np.nanstd(im_))
+            (rel_intensity_threshold * np.nanmean(im_[im_>0]) \
+             + 2*np.nanstd(im_[im>0]))
         xspot = xspot[keep]; yspot = yspot[keep]
     except IndexError as e:
         import pdb; pdb.set_trace()
@@ -75,7 +75,7 @@ def detect3D(im, radius, pix2um, opt = 1,
     References:
         https://stackoverflow.com/a/55456970
     """
-
+    im = np.ma.masked_where(im == 0, im)
     # I'll be looking in a 5x5x5 area
     #imf = maximum_filter(im, size= (radius, ) * im.ndim)
     imf = im
@@ -111,7 +111,7 @@ def detect3D(im, radius, pix2um, opt = 1,
         border_width = tuple(int(x) for x in np.around(radius * .75 / pix2um * pix2um[0]))
         coords = peak_local_max(imf, min_distance = mindist,
                     exclude_border = border_width,
-                    indices = True, threshold_abs = rel_intensity_threshold*thresh)
+                    threshold_abs = rel_intensity_threshold*thresh)
     else:
         raise NotImplementedError
 
@@ -130,14 +130,15 @@ def inspect_spots(stack, coords, radius = 20, spacing = (1., 1., 1.)):
     Notes:
         - on '~\Downloads\data\dev\pyth\*before*.tif' produces perfect detection
     """
+
     #stack = np.squeeze(np.moveaxis(stack, 2, 0))
     stack = np.moveaxis(stack, (2, 3), (1, 0))
 
     #coords = np.asarray([np.roll(np.round(x[:3]).astype(int), 1) for x in coords])
+    coords = np.vstack(coords)
     coords = [rollnflip(x) for x in coords]
-    coords = np.array(coords)
+    #coords = np.array(coords)
     #corods = np.ma.masked_where(np.isnan(coords), coords)
-
 
     #spacing = np.roll(np.asarray(spacing), 1)
     # add time dimension to spacing, keeping the value small

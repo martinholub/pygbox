@@ -863,17 +863,14 @@ def inspect_mask(stack, mask, spacing = (1., 1., 1.),
 
         # option 3 render as a new label layer
 
-
     napari.run() # anything after this will run once the window closes
     # may have to run this from command line!
 
     # get (updated) mask
     mask = labels_layer.data
     if mask.ndim == 2: mask = np.reshape(mask, (1, ) + mask.shape)
-    mask = np.moveaxis(mask, 0, 2)
-
+    mask = np.moveaxis(mask, (1, 0), (2, 3))
     # TODO: find a way how to get mask from newly added layer
-    mask = np.reshape(mask, mask_shape)
     return mask
 
 def radial_mask(im, radius, pix2um):

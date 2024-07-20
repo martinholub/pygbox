@@ -27,8 +27,8 @@ def make_fpath( head, tail = None, ext = None, append_date = True):
         print(fpath + ": Warning:File already exists!")
     return fpath
 
-def get_fpath(head, tail, ext, append_date = False):
+def get_fpath(head, tail, ext, append_date = False, errval = []):
     try:
         return glob(make_fpath(head, tail, ext, append_date = False)).pop()
     except IndexError as e:
-        return []
+        return errval

@@ -56,8 +56,8 @@ def pipeline(args):
         scc.process({
                 'Detector': {
                     'radius': 15, # in pixels
-                    'rel_intensity_threshold': 1.5,
-                    'rel_min_distance': 8,
+                    'rel_intensity_threshold': 1.0,
+                    'rel_min_distance': 2,
                     'objects': get_fpath(fpath, "+_Detector*", ".*"),
                     'verbose': True,
                 },
@@ -67,8 +67,7 @@ def pipeline(args):
                     'verbose': True,
                     },
                 'Quantifier': {
-                    #'results': glob(make_fpath(f, "+_Quantifier*", ".*", append_date = False)).pop(),
-                    'results': {},
+                    'results': get_fpath(fpath, "+_Quantifier", ".*", {}),
                     'verbose': False,
                     }
         })

@@ -378,8 +378,10 @@ class Detector(object):
                     rel_intensity_threshold = self.rel_intensity_threshold)
 
             #if len(xspot) == 0: xspot, yspot, zspot = (np.asarray([np.nan]), )*3
-            coords = np.hstack( (xspot, yspot, zspot,
-                                np.ones_like(zspot, dtype = np.int)*t))
+
+            #coords = np.hstack( (xspot, yspot, zspot,
+            #                    np.ones_like(zspot, dtype = np.int)*t))
+            coords = np.array((xspot, yspot, zspot, np.ones_like(zspot, dtype = np.int)*t)).T
             objects.append(coords)
 
 
@@ -412,7 +414,8 @@ class Detector(object):
                 append_date = False)
         else:
             fpath = pth.splitext(fpath)[0]
-            fpath = fpath + "_" + type(self).__name__
+            if not type(self).__name__ in fpath:
+                fpath = fpath + "_" + type(self).__name__
         np.save(fpath, self.objects)
 
     def load(self, fpath = ""):
@@ -522,7 +525,6 @@ class Segmentor(object):
                         if not (new_mask.sum() == self.mask.sum()):
                             self.mask = new_mask
                             self.save(fpath)
-
                     return
                 except Exception as e:
                     pass
@@ -622,8 +624,8 @@ class Segmentor(object):
         if self.verbose:
             new_mask = masking.inspect_mask(im, masks_all, self.stack.pix2um)
 
-        self.mask = masks_all
-        self.save()
+            if not (new_mask.sum() == masks_all.sum()):
+                self.mask = new_mask; self.save()
 
     def register_masks(self, masks = None):
         """ Assign pixels uniquely to objects within a mask
@@ -846,7 +848,6 @@ class Segmentor(object):
     def save(self, fpath = ""):
         if not fpath:
             fpath = self.stack.fpath
-
         fpath = pth.splitext(fpath)[0]
         fpath = fpath + "_" + type(self).__name__
         np.savez(fpath, corners = self.corners, mask = self.mask)
@@ -919,7 +920,13 @@ class Quantifier(object):
                 icrop = [icrop] * len(itime)
             if not icrop:
                 # get unique labels, ignore 0=background
-                icrop = [np.unique(self.segmentor.mask[..., tt])[1:] - 1 for tt in itime]
+                #icrop = [np.unique(self.segmentor.mask[..., tt])[1:] - 1 for tt in itime]
+                # get unique labels, incl 0=background
+                icrop = [np.unique(self.segmentor.mask[..., tt]) for tt in itime]
+                #icrop = [\
+                #    np.unique(self.segmentor.mask[..., tt])[1:] if \
+                #    len(np.unique(self.segmentor.mask[..., tt])) > 1 \
+                #    else np.array([0]) for tt in itime]
 
             if not isinstance(descriptors, (tuple, list, )): descriptors = [descriptors]
             if isinstance(descriptors, (tuple, )): descriptors = list(descriptors)
@@ -930,6 +937,7 @@ class Quantifier(object):
             for it in list(results.keys()):
                 axspans_it = []
                 for i, ic in enumerate(list(results[str(it)].keys())):
+                    if int(ic) == 0: continue
                     if not results[str(it)][str(ic)]: #Seems superfluous
 
                         # MH240704
@@ -969,9 +977,11 @@ class Quantifier(object):
                         results[str(it)][str(ic)] = this_result
                 axspans.append(axspans_it)
 
-        for it in list(results.keys()):
+        if self.verbose:
+            raise NotImplementedError("4D featrue visualization is not implemented!")
             dfres = {   #'id': np.array([int(x) + 1 for x in results[str(it)].keys()]),
-                        'id': np.array([int(x) + 1 for x in results.keys()]),
+                        #'id': np.array([int(x) for x in results.keys()]),
+                        'id': [np.array(list(v.keys()), dtype = np.int) for k, v in results.items()],
                         # bookkeep index -1 shift from earlier -.-
                         'qc': self.parse_result(        descriptor = 'qc',
                                                         value = None, result = results),
@@ -992,15 +1002,33 @@ class Quantifier(object):
                         'SI (+Bg)': self.parse_result(  descriptor = 'sum_intensity',
                                                         value = 'withBG', result = results)
                         } # dict for storing info for viz
-            for key in dfres: dfres[key] = np.insert(dfres[key], 0, 0) # add row for background
-            dfres = pd.DataFrame.from_dict(dfres)
-            #dfres = dfres.set_index('id', drop = False, inplace = False)
-            mask = ops.map_labels(self.segmentor.mask[..., int(it)])
-            if self.verbose:
-                _ = masking.inspect_mask(   self.segmentor.stack.im[..., int(it)],
-                                            mask,
-                                            self.segmentor.stack.pix2um,
-                                            {'features': dfres})
+            #for key in dfres: dfres[key] = np.insert(dfres[key], 0, 0) # add row for background
+
+            #MH: Would have figure out how I can pass in features in 4D
+            ## it is possible you can make a dict:
+            ## {label: {feature: [0...N], ...}
+            #transpose dictionary
+            dfresT = {k: {} for k in dfres.keys()}
+            for k in dfresT.keys():
+                try:
+                    dfresT[k] = dfres[k].T
+                except AttributeError as e:
+                    dfresT[k] = np.asarray(dfres[k]).T
+
+            # pull out readout per unqiue ID
+            ids = [np.unique(v)[0] for v in dfresT['id']]
+            dfresF = {str(x):{} for x in sorted(ids)}
+            for i, idx in enumerate(ids):
+                dfresX = {k : v[i, :] for k,v in dfresT.items()}
+                dfresF[str(idx)] = dfresX
+            dfres = pd.DataFrame.from_dict(dfresF).T
+            #dfres = dfres.drop('id', axis = 1)
+            dfres = dfres.set_index('id', drop = False, inplace = False)
+            #produces: ValueError: Length of values (1000) does not match length of index (1)
+            mask = ops.map_labels(self.segmentor.mask)
+            _ = masking.inspect_mask(   self.segmentor.stack.im, mask,
+                                        self.segmentor.stack.pix2um,
+                                        {'features': dfres})
         # TODO: cam play around with formatting but that is just comsetics
         if do_assign:
             self.results = results
@@ -1037,8 +1065,8 @@ class Quantifier(object):
 
         out = []
         for it in itime: # this may be a bit slow?
+            icout = []
             for ic in icrop[int(it)]:
-
                 # Option A:
                 #if res[it][ic]['qc']: # if passed quality control
                 #    out.append(res[it][ic][descriptor][value])
@@ -1046,11 +1074,14 @@ class Quantifier(object):
                 #    out.append(np.nan)
 
                 # Option B - allows output of QC for later handling:
+                if int(ic) == 0:
+                    icout.append(None)
+                    continue
                 if value:
-                    out.append(res[it][ic][descriptor][value])
+                    icout.append(res[it][ic][descriptor][value])
                 else:
-                    out.append(res[it][ic][descriptor])
-
+                    icout.append(res[it][ic][descriptor])
+            out.append(icout)
         return np.asarray(out)
 
     def save(self, fpath = ""):
