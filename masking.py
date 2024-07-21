@@ -378,7 +378,7 @@ def planar_mask(im, pix2um = (1, 1, 1)):
         print("planar_masking.binary_dilation: 3D Dilating with diamond")
         fgms = binary_dilation(fgms, iterations = 1)
 
-    if nZ > 1: fgms = dilate_mask_z(fgms)
+    #if nZ > 1: fgms = dilate_mask_z(fgms)
 
     # Verbose inspection
     # if fgms.sum() > 0:
@@ -469,7 +469,7 @@ def planar_mask_lambda(im, pix2um = (1, 1, 1)):
         print("planar_masking.binary_dilation: 3D Dilating with diamond")
         fgms = binary_dilation(fgms, iterations = 1)
 
-    fgms = dilate_mask_z(fgms)
+    #fgms = dilate_mask_z(fgms)
 
     # Verbose inspection
     # if fgms.sum() > 0:

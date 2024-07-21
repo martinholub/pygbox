@@ -22,7 +22,7 @@ def pipeline(args):
     #get paths
     allfpaths = glob(ns.JACOB +
                      r'\2024_06_03 data mining_expansion' +
-                     r'\A020_cutouts_oneplane_t_as_is_rois\test\*_roi.tif')
+                     r'\A020_cutouts_oneplane_t_as_is_rois\*_roi.tif')
     allfnames = [pth.split(f)[-1] for f in allfpaths]
     allidxs = [int(re.search("^[0-9]{1,3}?(?=_)", f).group(0)) for f in allfnames]
 
@@ -56,7 +56,7 @@ def pipeline(args):
         scc.process({
                 'Detector': {
                     'radius': 15, # in pixels
-                    'rel_intensity_threshold': 1.0,
+                    'rel_intensity_threshold': 1.3,
                     'rel_min_distance': 2,
                     'objects': get_fpath(fpath, "+_Detector*", ".*"),
                     'verbose': True,

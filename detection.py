@@ -32,7 +32,7 @@ def detect2D(   im, radius, rel_intensity_threshold = 1,
     mindist = int(rel_min_distance * radius)
     # detect local minima
     spots = peak_local_max(im_, min_distance = mindist,
-                exclude_border = (radius/2, ) * im_.ndim)
+                exclude_border = (int(radius/2), ) * im_.ndim)
     xspot, yspot = (spots[:, 0], spots[:, 1])
     ## TODO?: blob finding at different scales
 

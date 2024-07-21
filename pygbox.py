@@ -533,7 +533,8 @@ class Segmentor(object):
         centrs = self.detector.objects
         # sort and group found spots
         idx = [o[-1] for o in centrs]
-        idx, centrs = zip(*sorted(zip(idx, centrs)))
+        #idx, centrs = zip(*sorted(zip(idx, centrs)))
+        centrs = sorted(centrs, key = lambda x: x[-1])
         #np.where(~np.isin(np.arange(100), idx)) # could do this
         centrs = [list(v) for k, v in groupby(centrs, key = lambda x: x[-1])]
         # loop over object centroids
