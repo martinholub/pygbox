@@ -100,7 +100,6 @@ def get_nD_gauss(shape, sigma, mu = None):
 
     return val, axs
 
-
 def fourier_filter(im, cutoff = 25):
     """Filter in frequency space - leads to image smoothing
 
@@ -303,7 +302,6 @@ def mercator_mask(im, pix2um = (1, 1, 1)):
     # return measure.find_contours(binary_spokes)
     return mask_spokes
 
-
 def planar_mask(im, pix2um = (1, 1, 1)):
     """Construct 3D mask by plane by plane masking
 
@@ -340,7 +338,7 @@ def planar_mask(im, pix2um = (1, 1, 1)):
         fgm = binary_opening(fgm, disk(3), iterations = 1) # MH 240704
 
         # connect fragmented regions
-        #fgm = binary_closing(fgm, diamond(5)) # 15 .. 21 works fine
+        fgm = binary_closing(fgm, diamond(3)) # 15 .. 21 works fine
 
         # remove small regions
         #fgm = binary_opening(fgm, disk(5))
@@ -354,7 +352,7 @@ def planar_mask(im, pix2um = (1, 1, 1)):
 
         #dilate
         #for _ in range(char_size // 2): # around 3 .. 5 rounds of dil work fine
-        fgm = binary_dilation(fgm, disk(3), iterations = 4)
+        fgm = binary_dilation(fgm, disk(3), iterations = 5)
         #fgm = dilate_mask(imiz, fgm)
 
         # fill holes in mask
@@ -369,7 +367,6 @@ def planar_mask(im, pix2um = (1, 1, 1)):
         fgms = mask_central_object(fgms)[0]
     except ValueError as e: # does not happen
         print("Could not find central object in the mask!")
-        import pdb; pdb.set_trace()
 
     #MH-18052022 - this helps, in Z, likely due to pixel size assymetry
     try:
@@ -526,7 +523,6 @@ def mask_central_object(im):
     im_bg = ~im_fg
     return im_fg, im_bg, thr
 
-
 def imthresh(im):
     """Find intensity threshold value and subtract it from an image
 
@@ -682,7 +678,6 @@ def _plot_threshold_model_fit(x, fits, pts, thresh = None):
     #plt.show()
     viz.viz.savefig(ax, 'threshold_model.svg')
 
-
 def dilate_mask(im, mask, step_size = 1):
     """Iteratively dilate mask to capture most of signal
 
@@ -740,8 +735,6 @@ def dilate_mask_z(mask, opt = 1):
 
     mask = np.reshape(mask, mshape)
     return mask
-
-
 
 def smooth_boundary(mask):
     """Smooth mask boundary by applying Savitzky Golay Filter
@@ -867,10 +860,12 @@ def inspect_mask(stack, mask, spacing = (1., 1., 1.),
     # may have to run this from command line!
 
     # get (updated) mask
+    import pdb; pdb.set_trace()
     mask = labels_layer.data
     if mask.ndim == 2: mask = np.reshape(mask, (1, ) + mask.shape)
     mask = np.moveaxis(mask, (1, 0), (2, 3))
     # TODO: find a way how to get mask from newly added layer
+
     return mask
 
 def radial_mask(im, radius, pix2um):

@@ -348,7 +348,8 @@ class Detector(object):
                         do_save = 0
                     return
                 except Exception as e:
-                    pass
+                    do_save = 1
+                    print(f"{type(e).__name__} was raised: {e}")
 
         try: # check if instance of Stack is passed in
             fpath = im.fpath
@@ -370,7 +371,6 @@ class Detector(object):
                     self.radius, self.rel_intensity_threshold,
                     self.rel_min_distance, projection = 'max')
 
-
             else:
                 xspot, yspot, zspot = detection.detect3D(
                     im[:, :, :, t], self.radius, pix2um, opt = 2,
@@ -378,25 +378,8 @@ class Detector(object):
                     rel_intensity_threshold = self.rel_intensity_threshold)
 
             #if len(xspot) == 0: xspot, yspot, zspot = (np.asarray([np.nan]), )*3
-
-            #coords = np.hstack( (xspot, yspot, zspot,
-            #                    np.ones_like(zspot, dtype = np.int)*t))
             coords = np.array((xspot, yspot, zspot, np.ones_like(zspot, dtype = np.int)*t)).T
             objects.append(coords)
-
-
-            ## DEBUG
-            # if self.verbose:
-            #     im_ = im[:, :, 0, t]
-            #     ax = viz.imshow([], im_, gamma = 0.5, sat = 0.3, pixel_size = .19)
-            #     viz.spots(ax, yspot, xspot, {'s': np.pi*self.radius**2})
-            #     plots.wait()
-
-            # store spots
-            # try:
-            #     objects.append([(x,y,z) for x,y,z in zip(xspot, yspot, zspot)])
-            # except Exception as e:
-            #     objects.append(([], [], []))
 
         objects = [o for o in objects if len(o) > 0]
         if self.verbose:
@@ -407,7 +390,7 @@ class Detector(object):
         if do_save:
             self.save(fpath)
 
-    def save(self, fpath):
+    def save(self, fpath = ""):
         if not fpath:
             fpath = make_fpath(
                 self.stack.fpath, "+_" + type(self).__name__, ".npy",
@@ -512,14 +495,6 @@ class Segmentor(object):
                 try:
                     self.load(fpath) # assings self.corners, self.mask
                     if self.verbose:
-                        # repilcate code from bottom of this function
-                        # for t in range(self.mask.shape[3]):
-                        #     labels_old = np.unique(self.mask[..., t])
-                        #     new_mask = masking.inspect_mask(im[..., t], self.mask[..., t], self.stack.pix2um)
-                        #     labels_new = np.unique(new_mask)
-                        #
-                        #     if not (new_mask.sum() == self.mask[..., t].sum()):
-                        #         self.mask[..., t] = new_mask
 
                         new_mask = masking.inspect_mask(im, self.mask, self.stack.pix2um)
                         if not (new_mask.sum() == self.mask.sum()):
@@ -527,6 +502,7 @@ class Segmentor(object):
                             self.save(fpath)
                     return
                 except Exception as e:
+                    print(f"{type(e).__name__} was raised: {e}")
                     pass
 
         # Fetch data to analyze
@@ -569,13 +545,6 @@ class Segmentor(object):
                 #radial mask
                 #mask = masking.radial_mask(im_, self.detector.radius, self.stack.pix2um)
 
-                ## DEBUG
-                # if self.verbose and mask.sum() > 0 and (ic%10 == 0):
-                #     ax = viz.imshow([], im_[..., im_.shape[2]//2], gamma = 0.5, sat = 0.3)
-                #     ax = viz.imshow([], ops.project(im_), gamma = 0.5, sat = 0.3)
-                #     ax = viz.fgm(ax, mask[..., im_.shape[2]//2])
-                #     plots.wait()
-
                 #apply some 3D checks on the mask
                 #if not masking.qc_mask3D(mask): continue
 
@@ -584,12 +553,11 @@ class Segmentor(object):
                 #threshs.append(thresh); snrs.append(snr)
 
             # store info at highest level
-
             if len(masks) == 0:
                 masks = [np.zeros((nX, nY, nZ), dtype = np.bool)]
             elif len(masks) > 1:
                 #raise NotImplementedError
-                # MH though this would work, can try later
+                # MH240723 though this would work, can try later
                 mask = np.zeros_like(masks[0],  dtype = np.int)
                 for i, mm in enumerate(masks):
                     mm = mm.astype(np.int)
@@ -612,21 +580,17 @@ class Segmentor(object):
         #masks_all[..., :] = np.quantile(masks_all.astype(int),
         #                                q = .5, axis = -1, keepdims = True) > .5
 
-        # if self.verbose:
-        #     for t in range(masks_all.shape[3]):
-        #         labels_old = np.unique(masks_all[..., t])
-        #         new_mask = masking.inspect_mask(im[..., t], masks_all[..., t], self.stack.pix2um)
-        #         labels_new = np.unique(new_mask)
-        #         if not np.in1d(labels_new, labels_old).all():
-        #             masks_all[..., t] = new_mask
-        #             self.corners[t] = masking.recenter_corners(masks_all[..., t],
-        #                                 ext, (nX, nY, nZ))
+        # force mask atthe top and bottom layers to be zero if mask is thick
+        if masks_all.shape[2] > 5:
+            masks_all[:, :, 0, :] = 0; masks_all[:, :, -1, :] = 0;
 
         if self.verbose:
             new_mask = masking.inspect_mask(im, masks_all, self.stack.pix2um)
-
             if not (new_mask.sum() == masks_all.sum()):
-                self.mask = new_mask; self.save()
+                self.mask = new_mask
+            else:
+                self.mask = masks_all
+        self.save()
 
     def register_masks(self, masks = None):
         """ Assign pixels uniquely to objects within a mask
@@ -850,7 +814,8 @@ class Segmentor(object):
         if not fpath:
             fpath = self.stack.fpath
         fpath = pth.splitext(fpath)[0]
-        fpath = fpath + "_" + type(self).__name__
+        if not type(self).__name__ in fpath:
+            fpath = fpath + "_" + type(self).__name__
         np.savez(fpath, corners = self.corners, mask = self.mask)
 
     def load(self, fpath = ""):
@@ -923,7 +888,11 @@ class Quantifier(object):
                 # get unique labels, ignore 0=background
                 #icrop = [np.unique(self.segmentor.mask[..., tt])[1:] - 1 for tt in itime]
                 # get unique labels, incl 0=background
-                icrop = [np.unique(self.segmentor.mask[..., tt]) for tt in itime]
+                if self.segmentor.mask.dtype == np.bool:
+                    intmask = self.segmentor.mask.astype(np.int)
+                else:
+                    intmask = self.segmentor.mask
+                icrop = [np.unique(intmask[..., tt]) for tt in itime]
                 #icrop = [\
                 #    np.unique(self.segmentor.mask[..., tt])[1:] if \
                 #    len(np.unique(self.segmentor.mask[..., tt])) > 1 \
@@ -951,19 +920,6 @@ class Quantifier(object):
                         im_, thresh, snr = self.get_threshold(im_bg)
                         axspans_it.append(axspan)
 
-                        # Check correctness of mask and crop
-                        # if self.verbose and fgm_.sum() > 0 and (i%5 == 0):
-                        #     #import pdb; pdb.set_trace()
-                        #     # im_show = np.squeeze(im_[:,:,im_.shape[2]//2, int(it)])
-                        #     # ax = viz.imshow(    [], im_show, gamma = 0.5, sat = 0.3,
-                        #     #                     kwargs = {'cmap': 'Spectral'})
-                        #     # #ax = viz.imshow([], ops.project(im_), gamma = 0.5, sat = 0.3)
-                        #     # ax = viz.fgm(ax, fgm_[..., fgm_.shape[2]//2])
-                        #     # plots.wait()
-                        #
-                        #     _ = masking.inspect_mask( [im_bg, im_], fgm_,
-                        #                 self.segmentor.stack.pix2um)
-
                         this_result = {}
                         this_result['thresh'] = thresh
                         this_result['snr'] = snr
@@ -981,9 +937,9 @@ class Quantifier(object):
         if self.verbose:
             raise NotImplementedError("4D featrue visualization is not implemented!")
             dfres = {   #'id': np.array([int(x) + 1 for x in results[str(it)].keys()]),
+                        # bookkeep index -1 shift from earlier -.-
                         #'id': np.array([int(x) for x in results.keys()]),
                         'id': [np.array(list(v.keys()), dtype = np.int) for k, v in results.items()],
-                        # bookkeep index -1 shift from earlier -.-
                         'qc': self.parse_result(        descriptor = 'qc',
                                                         value = None, result = results),
                         'thresh': self.parse_result(    descriptor = 'thresh',
@@ -1005,10 +961,10 @@ class Quantifier(object):
                         } # dict for storing info for viz
             #for key in dfres: dfres[key] = np.insert(dfres[key], 0, 0) # add row for background
 
-            #MH: Would have figure out how I can pass in features in 4D
+            #MH240723: Would have figure out how I can pass in features in 4D
             ## it is possible you can make a dict:
             ## {label: {feature: [0...N], ...}
-            #transpose dictionary
+            # transpose dictionary - thught this would work but it did not
             dfresT = {k: {} for k in dfres.keys()}
             for k in dfresT.keys():
                 try:
@@ -1046,11 +1002,13 @@ class Quantifier(object):
 
         return qc
 
-    def parse_result(   self, descriptor = 'radius_of_gyration',
-                        value = 'default', itime = 0, icrop = 0,
+    def parse_result(self, descriptor = 'radius_of_gyration',
+                        value = 'default', itime = 0, icrop = None,
                         result = {}):
         """ Parse result of quantifier
         """
+        doforce = False
+
         if not result:
             try:
                 res = self.results
@@ -1061,8 +1019,11 @@ class Quantifier(object):
 
         if not itime:
             itime = list(res.keys())
-        if not icrop:
+        if icrop == None:
             icrop = [list(r.keys()) for (_, r) in res.items()]
+        elif isinstance(icrop, (int, )):
+            icrop = [[str(icrop)] for _ in range(len(itime))]
+            doforce = True
 
         out = []
         for it in itime: # this may be a bit slow?
@@ -1075,7 +1036,7 @@ class Quantifier(object):
                 #    out.append(np.nan)
 
                 # Option B - allows output of QC for later handling:
-                if int(ic) == 0:
+                if (int(ic) == 0) and not doforce: #MH240723 - forcing bg information
                     icout.append(None)
                     continue
                 if value:

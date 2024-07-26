@@ -133,10 +133,14 @@ def inspect_spots(stack, coords, radius = 20, spacing = (1., 1., 1.)):
 
     #stack = np.squeeze(np.moveaxis(stack, 2, 0))
     stack = np.moveaxis(stack, (2, 3), (1, 0))
-
+    nT, nZ, nX, nY = stack.shape
     #coords = np.asarray([np.roll(np.round(x[:3]).astype(int), 1) for x in coords])
-    coords = np.vstack(coords)
-    coords = [rollnflip(x) for x in coords]
+    try:
+        coords = np.vstack(coords)
+        coords = [rollnflip(x) for x in coords]
+    except ValueError as e:
+        #no spot found. creating a mock spot as visual inspection was requested.
+        coords = np.array([[0, nZ//2, nX//2, nY//2]])
     #coords = np.array(coords)
     #corods = np.ma.masked_where(np.isnan(coords), coords)
 

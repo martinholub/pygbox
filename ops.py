@@ -417,13 +417,8 @@ def pad_data(xydata, padval = np.nan):
         xydata_out.append((xx, yy))
     return xydata_out
 
-def summarize_data(xydata):
+def summarize_data(y):
     """compute descriptive statistics"""
-    x = np.asarray([x for x, _ in xydata])
-    y = np.asarray([y for _, y in xydata])
-
-    x = np.nanmean(x, axis = 0) # reduce dimension, formality
-
     # y-error
     n = np.count_nonzero(~np.isnan(y), axis = 0)
     ystd = np.nanstd(y, axis = 0)
@@ -432,7 +427,7 @@ def summarize_data(xydata):
     # y-stat
     y = np.nanmean(y, axis = 0)
 
-    return x, y, (ystd, yerr)
+    return y, (ystd, yerr)
 
 def relative_y(y):
     """

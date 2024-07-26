@@ -125,9 +125,9 @@ def customize_violin(ax, x, parts, stat = 'median'):
     ax.tick_params(axis = 'both', direction = 'in')
     ax.yaxis.set_ticks_position('both')
     # get colors, but drpp the first color
-    colors = plt.rcParams['axes.prop_cycle'].by_key()
-    #colors = ['#9467bd', '#2ca02c', '#ff7f0e', ''#ff7f0e'']
-    import pdb; pdb.set_trace()
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    #colors = ['#9467bd', '#2ca02c', '#ff7f0e', '#ff7f0e']
+    #import pdb; pdb.set_trace()
     if len(x) > 2:
         colors = np.roll(np.array(colors), 1)
     for i, pc in enumerate(parts['bodies']):
@@ -436,8 +436,8 @@ def plot_expansion_scatter(ax, plotpairs, legends):
 def plot_expansion_shaded(ax, x, y, yerr):
     """Plot mean and confidence interval"""
 
-    ax.plot(x, y, "k-")
-    ax.fill_between(x, y - yerr, y + yerr, color = "k", alpha = 0.2)
+    ax.plot(x, y, "r-", alpha = 1.0, lw = 2.0)
+    ax.fill_between(x, y - yerr, y + yerr, color = "r", alpha = 0.1)
     return ax
 
 def plot_expansion(data, legends = None):

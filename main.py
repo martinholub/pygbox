@@ -21,8 +21,8 @@ def pipeline(args):
 
     #get paths
     allfpaths = glob(ns.JACOB +
-                     r'\2024_06_03 data mining_expansion' +
-                     r'\A020_cutouts_oneplane_t_as_is_rois\*_roi.tif')
+                     r'\2024_06_03 data mining_addition' +
+                     r'\A020_cutouts_oneplane_t_as_is_rois\yC\*_roi.tif')
     allfnames = [pth.split(f)[-1] for f in allfpaths]
     allidxs = [int(re.search("^[0-9]{1,3}?(?=_)", f).group(0)) for f in allfnames]
 
@@ -36,7 +36,6 @@ def pipeline(args):
 
     pix2um = (.118, .118, 1.0)
     processedid = 0
-
     for i, fpaths in enumerate(groupedfpaths):
         ims = []
         # Load planes from valid paths
@@ -57,7 +56,7 @@ def pipeline(args):
                 'Detector': {
                     'radius': 15, # in pixels
                     'rel_intensity_threshold': 1.3,
-                    'rel_min_distance': 2,
+                    'rel_min_distance': 2.5,
                     'objects': get_fpath(fpath, "+_Detector*", ".*"),
                     'verbose': True,
                 },
