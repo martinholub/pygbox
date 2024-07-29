@@ -92,7 +92,7 @@ def plot_ecdf(ax, x, legend = '', xlabel = ''):
     ax.set_ylabel("eCDF [-]")
     ax.set_xlabel(xlabel)
 
-def plot_violin(ax, x, xlabels, ylabel, stat = 'mean'):
+def plot_violin(ax, x, xlabels, ylabel, stat = 'median'):
     """Violin plot
     Consider seaborn violin plot in the future
     """
