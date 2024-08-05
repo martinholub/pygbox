@@ -22,10 +22,11 @@ def set_plot_style(pltstyle = 'seaborn-paper', kwargs = {}):
         'font.family': 'sans-serif',
         'font.sans-serif': ['Tahoma'],
         "text.usetex": False,
-        "axes.facecolor": "white"}
+        "axes.facecolor": "white",
+        'image.cmap': 'viridis'}
     pltparams.update(kwargs)
     mpl.rcParams.update(pltparams)
-    plt.set_cmap("viridis")
+    #plt.set_cmap("viridis")
 
 def make_fig(nrows = 1, ncols = 1, fig_kw = {}):
     """tba"""
