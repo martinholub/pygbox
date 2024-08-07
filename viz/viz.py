@@ -33,7 +33,7 @@ def imshow(ax, x, gamma = 1, pixel_size = None, sat = 0, kwargs = {}):
     nframes = int(np.prod(x.shape[2:]))
     x = np.reshape(x, x.shape[:2] + (nframes, ))
 
-    x = ops.normalize(x) # normalize between 0 and 1 without stretching
+    #x = ops.normalize(x) # normalize between 0 and 1 without stretching
 
     if gamma != 1:
         x = x ** gamma
@@ -60,8 +60,8 @@ def imshow(ax, x, gamma = 1, pixel_size = None, sat = 0, kwargs = {}):
             plt.draw()
             plt.waitforbuttonpress(0.2)
 
-    #ax.axis('off')
-    plt.tight_layout()
+    ax.axis('off')
+    #plt.tight_layout()
 
     if pixel_size:
         scalebar(ax, pixel_size)
@@ -77,6 +77,20 @@ def framenumber(ax, i):
                 fontproperties = fontprops, horizontalalignment = 'right',
                 verticalalignment = 'top', color = 'white')
 
+def imannotate(ax, txt, xy = (0.95, 0.95), kwargs = {}):
+    """ Insert annotation on image in axes in standard way
+    """
+    fontprops = fm.FontProperties(size = 16, family = 'serif')
+    kwargs_ = {
+        'fontproperties': fontprops,
+         'horizontalalignment': 'right',
+         'verticalalignment': 'top',
+         'color': 'black',
+    }
+    kwargs_.update(kwargs)
+    ax.annotate(txt, xy = xy, xycoords = 'axes fraction', **kwargs_)
+    return ax
+
 def scalebar(ax, pixel_size, length = 5, show_text = True):
     """ Insert scale bar on axis
 
@@ -90,8 +104,8 @@ def scalebar(ax, pixel_size, length = 5, show_text = True):
     """
 
     if pixel_size:
-        fontprops = fm.FontProperties(size = 20, family = 'serif')
-        scb_col = 'white'
+        fontprops = fm.FontProperties(size = 16, family = 'serif')
+        scb_col = 'black'
         scb_loc = 'lower right'
         scb_len = length / pixel_size # in data_units
 

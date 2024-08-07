@@ -13,8 +13,8 @@ def project(im, how = 'max', ax = -1, kwargs = {}):
     how = how.lower()
 
     if im.shape[ax] == 1:
-        print('Cannot project along singleton dimension, returning unchnaged input.')
-        return im
+        print('Cannot project along singleton dimension, returning squeezed input.')
+        return np.squeeze(im, axis = ax)
 
     im = np.ma.masked_where(np.isnan(im), im)
 
