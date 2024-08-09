@@ -107,14 +107,14 @@ def plot_violin(ax, x, xlabels, ylabel, stat = 'median'):
     label_sample_size(ax, x)
     return parts
 
-def set_xaxis_labels(ax, labels, start = 1):
+def set_xaxis_labels(ax, labels, start = 1, do_rotate = True):
     ax.xaxis.set_tick_params(direction='in')
     ax.xaxis.set_ticks_position('both')
     if start:
         ax.set_xticks(np.arange(start, start + len(labels)))
     else:
         ax.set_xticks(np.arange(0, len(labels)))
-    if np.max([len(x) for x in labels]) > 3:
+    if (np.max([len(x) for x in labels]) > 3) and do_rotate:
         ax.set_xticklabels(labels, rotation = 45)
     else:
         ax.set_xticklabels(labels)
@@ -172,7 +172,7 @@ def adjacent_values(vals, q1, q3):
     lower_adjacent_value = np.clip(lower_adjacent_value, vals[0], q1)
     return lower_adjacent_value, upper_adjacent_value
 
-def label_sample_size(ax, x):
+def label_sample_size(ax, x, y = 0.8, kwargs = {}):
     """Add sample size info per each tick
     Use in combination with violin, bar plots
 
@@ -180,10 +180,13 @@ def label_sample_size(ax, x):
         https://www.python-graph-gallery.com/58-show-number-of-observation-on-violinplot
         https://matplotlib.org/stable/tutorials/advanced/transforms_tutorial.html
     """
+    kwargs_ = {  'fontsize': 16, 'fontfamily': 'sans-serif',
+                'horizontalalignment': 'center', 'rotation': 90}
+    kwargs_.update(**kwargs)
     trans = mpl.transforms.blended_transform_factory(ax.transData, ax.transAxes)
-    for tick, label, y in zip(ax.get_xticks(), ax.get_xticklabels(), x):
-        ax.text(tick-0.25, 0.8, "n=" + str(len(y)), transform = trans,
-                size = 12, horizontalalignment='center', rotation = 90)
+    for tick, label, x_ in zip(ax.get_xticks(), ax.get_xticklabels(), x):
+        ax.text(tick-0.5, y, "n=" + str(len(x_)), transform = trans,
+                **kwargs_)
 
 def plot_spokes(spokes, coords, kwargs = {}):
     """Plot radial intensity profiles as spokes"""
@@ -297,32 +300,55 @@ def plot_msd(ax, tau, msd, msd_std, kwargs = {}):
     ax.yaxis.set_tick_params(direction='in', which = 'both')
 
 
-def swarmplot(ax, x, xlabs = None, ylab = None, colors = None):
+def errswarmplot(ax, y, yerr, colors = None):
+    """add errors on top of swarm plot"""
+    xax = [[i]*len(y_) for i, y_ in enumerate(y)]
+    #import pdb; pdb.set_trace()
+    error_kw = {'capsize': 5, 'capthick': 1.5, 'elinewidth': 1.5,
+                'ecolor': 'darkgrey', 'barsabove': False, 'fmt': 'none',
+                'alpha': 1}
+    for xax_, y_, yerr_, c_ in zip(xax, y, yerr, colors):
+        #_ =ax.errorbar(np.array(xax).flatten(),
+        #                np.array(y).flatten(), np.array(yerr).flatten(),
+        #                **error_kw)
+        error_kw.update({'ecolor': c_})
+        #import pdb; pdb.set_trace()
+        _ = ax.errorbar(xax_, y_, yerr_, **error_kw)
+    return ax
+
+def swarmplot(  ax, x, xlabs = None, ylab = None, colors = None, xerr = None,
+                show_mean = False, add_box = True, how ='swarm', swkwargs = {}):
     """seaborn swarmplot"""
 
-    kwargs = {
+    swkwargs_ = {
         'alpha': 1,
-        'size': 2,
+        'size': 5,
     }
+    swkwargs_.update(swkwargs)
 
     if colors is None:
-        #colors = ['#9467bd', '#2ca02c', '#ff7f0e']
         colors = ['#9467bd', '#2ca02c', '#ff7f0e']
-        if len(x) > 2:
-            colors = np.roll(np.array(colors), 1)
+        #colors = plt.rcParams['axes.prop_cycle'].by_key()['color'][:len(x)]
+        if len(x) > 3:
+            colors2 = plt.rcParams['axes.prop_cycle'].by_key()['color']
+            colors2 = [c2 for c2 in colors2 if c2 not in colors]
+            colors += colors2
+            #colors = np.roll(np.array(colors), 1)
     elif len(colors) == 1:
         colors = colors * len(x)
+    colors = colors[:len(x)]
 
+    if add_box:
     #ax = sns.violinplot(ax = ax, data = x, saturation = 1, cut = 2, inner = None)
-
-    boxprops = {
-        'boxprops':{'facecolor':'none', 'edgecolor':'black'},
-        'medianprops':{'color':'black'},
-        'whiskerprops':{'color':'black'},
-        'capprops':{'color':'black'}
-    }
-    ax = sns.boxplot(   ax = ax, data = x, whis = 2, color = "white",
-                        saturation = 1., width = 0.5, **boxprops)
+        boxprops = {
+            'boxprops':{'facecolor':'none', 'edgecolor':'darkgrey'},
+            'medianprops':{'color':'darkgrey'},
+            'whiskerprops':{'color':'darkgrey'},
+            'capprops':{'color':'darkgrey'},
+            'fliersize': 0
+        }
+        ax = sns.boxplot(   ax = ax, data = x, whis = 3, color = "white",
+                            saturation = .2, width = .5, **boxprops)
     # iterate over boxes
     # for i,box in enumerate(ax.artists):
     #     box.set_edgecolor('black')
@@ -330,29 +356,45 @@ def swarmplot(ax, x, xlabs = None, ylab = None, colors = None):
     #     plt.setp(ax.artists, edgecolor = 'k', facecolor='w')
     #     plt.setp(ax.lines, color='k')
 
-    ax = sns.pointplot( ax = ax, data = x, estimator=np.mean, color = 'black',
-                       join = False, ci = None, markers = "*", scale = 1.5)
-    # https://stackoverflow.com/a/64636825
-    ax = sns.swarmplot(ax = ax, data = x, **kwargs)
-    #import pdb; pdb.set_trace()
+    if show_mean:
+        ax = sns.pointplot( ax = ax, data = x, estimator=np.nanmean, color = 'darkgrey',
+                           join = False, ci = None, markers = "-", scale = 0.5)
+    if how.lower().startswith('swarm'):
+        # https://stackoverflow.com/a/64636825
+        try:
+            ax = sns.swarmplot(ax = ax, data = x, **swkwargs_)
+        except Exception as e:
+            how = 'point'
+    elif how.lower().startswith('snspoint'):
+        ax = sns.pointplot( ax = ax, data = x, estimator=np.nanmean,
+                            errorbar = 'se',
+                            join = False, ci = None, markers = "o", scale = 3)
+    elif how.lower().startswith('point'):
+        raise NotImplementedError('Swarmplot from pyplot points not implemented')
+
     for color, collection in zip(colors, ax.collections[-len(x):]):
         collection.set_facecolor(color)
+        #import pdb; pdb.set_trace()
+
+    if xerr:
+        ax = errswarmplot(ax, x, xerr, colors)
     try:
         if np.mean(np.concatenate(x)) > 1e3: ax.set_yscale('log')
     except ValueError as e:
         if np.mean(x) > 1e3: ax.set_yscale('log')
-    if "intensity" in ylab: ax.set_ylim(bottom = 0)
 
 
+    #sample size:
+    #ax.set_ylim(bottom = 0)
+    label_sample_size(ax, x, y = .5)
     # beatify axes
-    if xlabs is not None: set_xaxis_labels(ax, xlabs, start = 0)
+    if xlabs is not None: set_xaxis_labels(ax, xlabs, start = 0, do_rotate = False)
     if ylab is not None: name_ax(ax, ylab = ylab)
     ax.yaxis.set_ticks_position('both')
     ax.xaxis.set_ticks_position('both')
     ax.tick_params(axis = 'both', direction = 'in')
     ax.xaxis.set_tick_params(direction='in',  which = 'both')
     ax.yaxis.set_tick_params(direction='in', which = 'both')
-
     return ax
 
 def get_whiskers(x, whis = 1.5):
