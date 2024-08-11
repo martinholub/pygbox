@@ -8,9 +8,9 @@ Author: Janni Harju
 Created: July 30th, 2024
 
 """
-import multiprocessing as mp #for calculating spatial correlations
+#import multiprocessing as mp #for calculating spatial correlations
 import numpy as np
-import h5py
+#import h5py
 from pygbox import ops #for ops.bg_sub
 from scipy.ndimage.measurements import center_of_mass
 from scipy.signal import convolve2d
@@ -60,10 +60,10 @@ def center_of_mass_diffusion(stack):
         stack (3D np.array): A stack of images (t, y, x)
 
     Returns:
-        ndarray: nt sized array of center of mass MSD over time 
+        ndarray: nt sized array of center of mass MSD over time
 
     References:
-        Author: Janni 
+        Author: Janni
     """
     check_dims(stack,3)
     nt=stack.shape[0]
@@ -72,25 +72,25 @@ def center_of_mass_diffusion(stack):
         frame=stack[t,:,:]
         if np.any(frame):
             com_pos[t,:]=center_of_mass(frame)
-   
+
     #displacement from time zero
     for t in range(nt):
         com_pos[t,:]-=com_pos[0,:]
-    
+
     com_msd=com_pos[:,0]**2+com_pos[:,1]**2
     return com_msd
 
 def difference_in_time(stack):
-    """ Calculate changes in the field over time 
+    """ Calculate changes in the field over time
 
     Args:
         stack (3D np.array): A stack of images (t, y, x)
 
     Returns:
-        ndarray: nt-1 sized array of I[t+1]-I[t] for each pixel and time point 
+        ndarray: nt-1 sized array of I[t+1]-I[t] for each pixel and time point
 
     References:
-        Author: Janni 
+        Author: Janni
     """
     check_dims(stack,3)
     nt, ny, nx=stack.shape
@@ -101,27 +101,27 @@ def difference_in_time(stack):
     return time_differences
 
 def laplacians(stack, dx):
-    """ Computes the discrete laplacians for (projected) image 
+    """ Computes the discrete laplacians for (projected) image
 
     Args:
         stack (3D np.array): A stack of images (t, y, x)
-        dx : pixel size in x/y 
+        dx : pixel size in x/y
 
     Returns:
-        ndarray: laplacian for (projected) image 
+        ndarray: laplacian for (projected) image
 
     References:
-        Author: Janni 
+        Author: Janni
     """
     check_dims(stack, 3)
     nt=stack.shape[0]
     laps=np.zeros(stack.shape)
-    
+
     # Define the Laplacian kernel
     kernel = np.array([[0,  1, 0],
                        [1, -4, 1],
                        [0,  1, 0]])
-    
+
     # Apply the Laplacian kernel to each frame
     for i in range(nt):
         lap=convolve2d(stack[i,:,:], kernel, mode="same")
@@ -217,7 +217,7 @@ def density_profile_1d(stack, distances, dx):
                     bin_intensities=bin_intensities[bin_intensities!=0] #exclude masked out pixels
                     intensities[i]+=np.nansum(bin_intensities)
                     counts[i]+=bin_intensities.size
-    
+
     intensities[counts>0]/=counts[counts>0]
     #return the normalized array
     return intensities/np.nansum(intensities)
@@ -235,7 +235,7 @@ def precalculate_distance_bins(ny,nx,distances, dx):
         np.array: for a pair of LINEAR indices, stores the bin number of the pixel-pixel distance
 
     """
-    indices = np.indices((ny, nx)).reshape(2, -1).T #ny*nx,2 array. 
+    indices = np.indices((ny, nx)).reshape(2, -1).T #ny*nx,2 array.
     distance_matrix = cdist(indices, indices, metric='euclidean') #2D array. Each dimension is a linear index.
     bin_indices = np.digitize(distance_matrix*dx[-1], distances) - 1
     return bin_indices
@@ -251,7 +251,7 @@ def find_global_bounding_box(stack):
     """
     non_zero_indices = np.argwhere(stack)
     if non_zero_indices.size == 0:
-        return (0,0), (0,0) 
+        return (0,0), (0,0)
     top_left = non_zero_indices.min(axis=0)[1:]  # Considering only x, y dimensions
     bottom_right = non_zero_indices.max(axis=0)[1:]
     return top_left, bottom_right
@@ -262,9 +262,9 @@ def crop_to_global_bbox(stack):
         stack (3D np.array): A stack of images (t, y, x)
 
     Returns:
-        np.array: a smaller stack, cropped to just fit pixels that are non-zero at some t and z 
+        np.array: a smaller stack, cropped to just fit pixels that are non-zero at some t and z
     """
-    top_left, bottom_right = find_global_bounding_box(stack) 
+    top_left, bottom_right = find_global_bounding_box(stack)
     cropped_stack = stack[:,top_left[0]:bottom_right[0]+1, top_left[1]:bottom_right[1]+1]
     return cropped_stack
 
@@ -280,11 +280,11 @@ def process_frame(frame, bin_indices, n_distances):
         mean_frame=np.nanmean(frame[non_zeros])
         var_frame=np.nanvar(frame[non_zeros]) #for normalizing so 1 at t=0
 
-        #all pairs of non-zero indices 
+        #all pairs of non-zero indices
         ind_i, ind_j = np.triu_indices(non_zeros.size, k=0)
 
         #fetch the linearized indices
-        pos_i=non_zeros[ind_i] 
+        pos_i=non_zeros[ind_i]
         pos_j=non_zeros[ind_j]
 
         #distance bin index for each pair
@@ -324,7 +324,7 @@ def spatial_correlation(stack, distances, dx, num_threads=8):
 
     check_dims(stack, 3)
     check_dims(distances,1)
-   
+
     #get rid of zeros to speed things up...
     cropped_stack=crop_to_global_bbox(stack)
     print(f"original shape {stack.shape}. after crop: {cropped_stack.shape}")
@@ -341,10 +341,10 @@ def spatial_correlation(stack, distances, dx, num_threads=8):
 
     total_intensities = np.nansum([result[0] for result in results], axis=0)
     total_counts = np.nansum([result[1] for result in results], axis=0)
-    
+
     valid_counts = total_counts > 0
     total_intensities[valid_counts] /= total_counts[valid_counts]
-    
+
     return total_intensities
 
 def temporal_correlation(stack, dt):
@@ -371,9 +371,10 @@ def temporal_correlation(stack, dt):
     mean_corr=np.zeros(nt)
     ts=np.arange(nt)*dt
     pixel_count=0
-    
+
     # Extract time series for non-zero pixels
-    for y,x in np.argwhere(stack[0,:,:]!=0):
+    #for y,x in np.argwhere(stack[0,:,:]!=0):
+    for y,x in np.argwhere(np.sum(stack, axis = 0)[:, :]!=0):
         time_series = stack[:,y,x]
         time_series = time_series-np.nanmean(time_series)
         # Calculate the autocorrelation function
@@ -389,7 +390,7 @@ def temporal_correlation(stack, dt):
         return ts, np.zeros(nt)
 
 def analyze_stack(images_3d, dt, pix2um, trap_radius, trap_center, out_file_name, subtract_median=False, num_threads=8, compression="gzip"):
-    check_dims(images_3d, 3) 
+    check_dims(images_3d, 3)
     if subtract_median: #mainly for simulations
         images_3d=subtract_median_normalize_each_frame(images_3d)
 
