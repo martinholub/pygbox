@@ -65,12 +65,45 @@ def plot_hist(ax, x, bins = 'fd', density = True, kwargs = {}):
     nn, bins = np.histogram(x, bins, density = density)
     #nn = nn / nn.max() # normalize to 1
     #bins = bins[:-1] + np.abs(np.diff(bins)) / 2
-    kwargs_ = {'lw': 2,
-                'alpha': 0.75,
-                'fill': True
-                }
     kwargs_.update(kwargs)
     ax.stairs(nn, bins, **kwargs_)
+
+def plot_hist2(ax, x, bins = 'fd', txt = None, xlab = None, kwargshist = {}, kwargskde = {}):
+    kwargs_hist = { 'ec': 'black',
+                    'color':  'darkgrey',
+                    'density': True
+                    }
+    kwargs_hist.update(kwargshist)
+    n, bins, parts = ax.hist(x, bins = bins, **kwargs_hist)
+
+    kwargs_kde = {  'fill': False,
+                    'lw': 3,
+                    'c': 'black'
+                    }
+    kwargs_kde.update(kwargskde)
+    axs= sns.kdeplot(x, ax = ax, **kwargs_kde)
+
+    # annotate ax
+    if not isinstance(txt, (str)):
+        #txt = "$\mu$={:.1f}\n$\pm${:.1f} min\n n={:d}".format(xmean_, xerr_, len(x))
+        xmean_, (xstd_, xerr_) = ops.summarize_data(x)
+        txt = "$\mu$={:.1f}$\pm${:.2f}".format(xmean_, xstd_)
+    annotate_ax(ax, txt = txt, x = .6, y = .8)
+
+    # beatify axes
+    ax.set_ylabel('frequency')
+    ax.set_yticklabels([])
+    ax.set_yticks([])
+    #ax.set_xlabel('$t_{eq}$ [min]')
+
+    if not xlab: xlab = '$Rg/Rg_{end}$ [-]'
+    ax.set_xlabel(xlab)
+    ax.xaxis.set_ticks_position('both')
+    ax.xaxis.set_tick_params(direction='in')
+
+    #  adjust axes limtis
+    #fig.tight_layout()
+    return ax
 
 def plot_ecdf(ax, x, legend = '', xlabel = ''):
     """Empirical cumulative distribution plot"""

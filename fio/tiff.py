@@ -58,6 +58,8 @@ def load(impath, order = "TZ"):
             shape = imstack.shape
             shape = shape + (1, ) * (4 - len(shape))
             imstack = np.reshape(imstack, shape)
+            if len(shape) == 5: # move time towards end
+                imstack = np.moveaxis(imstack, 0, 4)
             # move time axis to expected position
             if order.lower() == "zt":
                 imstack = np.swapaxes(imstack, -1, -2) # ..TZ to ..ZT

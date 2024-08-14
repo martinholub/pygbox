@@ -458,3 +458,33 @@ def subset_data(data, maxX = (1, 60), maxY = (0, 2.5e4)):
                 if (keepy(y, maxY[1]) & keepx(x, maxX[0]))]
 
     return trimdata
+
+def normalize_trace(x, how = 'last', y = None):
+    # discard any nans
+    # x_ = x[~np.isnan(x)]
+
+    # discard nans from ends of sequence
+    x_ = x.copy()
+    if any(np.isnan(x[0:3])):
+        x_ = x_[np.argmax(~np.isnan(x_)):]
+    # discard ending nans
+    if any(np.isnan(x[-3:])):
+        x_ = x_[:np.argmin(~np.isnan(x_))]
+    if how.lower() == 'last':
+        crp = len(x_)-int(len(x_)/10)
+        xn = np.nanmean(x_[crp:])
+    elif how.lower() == 'first':
+        xn = np.nanmean(x_[0:4])
+    if y:
+        x = y # normalize data in y by data in X
+    return x / xn
+
+def moving_average(x, w):
+
+    assert len(x) > w
+    padl = w - 1
+    padf = padl//2
+    padb = padl - padf
+    res = np.convolve(x, np.ones(w), "valid") / w
+    res = np.pad(res, (padf, padb), constant_values = np.nan)
+    return res

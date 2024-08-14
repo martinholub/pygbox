@@ -218,7 +218,7 @@ class Stack(object):
         self._pix2um = np.asarray(value)
 
 
-    def load(self, fpath = None):
+    def load(self, fpath = None, kwargs = {}):
         """ Load stack(s) from filepath
         """
         # TODO: how to handle multiple stacks in one path?
@@ -228,7 +228,7 @@ class Stack(object):
             self.fpath = fpath
         if not pth.isfile(fpath):
             print(fpath + ": Does not exist and will be created")
-        self.im = tiff.load(fpath)
+        self.im = tiff.load(fpath, **kwargs)
 
     def load_metadata(self, fname = ''):
         """ Load metadata from txt file
