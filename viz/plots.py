@@ -12,12 +12,12 @@ except ImportError as e:
 def set_plot_style(pltstyle = 'seaborn-paper', kwargs = {}):
     plt.style.use(pltstyle)
     pltparams = {
-        'xtick.labelsize': 16,
-        'ytick.labelsize': 16,
-        'font.size': 18,
-        'axes.labelsize': 18,
-        'axes.titlesize': 18,
-        'legend.fontsize': 14,
+        'xtick.labelsize': 20,
+        'ytick.labelsize': 20,
+        'font.size': 20,
+        'axes.labelsize': 20,
+        'axes.titlesize': 20,
+        'legend.fontsize': 16,
         'figure.figsize': (5, 5),
         'font.family': 'sans-serif',
         'font.sans-serif': ['Tahoma'],
@@ -509,11 +509,26 @@ def plot_expansion_scatter(ax, plotpairs, legends):
 
     return ax
 
-def plot_expansion_shaded(ax, x, y, yerr):
+def plot_expansion_shaded(ax, x, y, yerr, kwargs_mean = {}, kwargs_err = {}):
     """Plot mean and confidence interval"""
 
-    ax.plot(x, y, "r-", alpha = 1.0, lw = 2.0)
-    ax.fill_between(x, y - yerr, y + yerr, color = "r", alpha = 0.1)
+    kwargs_mean_ = {
+        'color': 'red',
+        'ls': '-',
+        'lw': 2.5,
+        'alpha': 1.0,
+    }
+    kwargs_mean_.update(kwargs_mean)
+    kwargs_err_ = {
+        'color':  kwargs_mean_['color'],
+        'alpha': 0.1,
+        'ls': '-',
+    }
+    kwargs_err_.update(kwargs_err)
+
+
+    ax.plot(x, y, **kwargs_mean_)
+    ax.fill_between(x, y - yerr, y + yerr, **kwargs_err_)
     return ax
 
 def plot_expansion(data, legends = None):

@@ -481,7 +481,12 @@ def normalize_trace(x, how = 'last', y = None):
 
 def moving_average(x, w):
 
-    assert len(x) > w
+    if len(x) < w:
+        print('Array len less than window size, skipping averaging')
+        return x
+    if w == 1:
+        print('Requested win size is 1, skipping averaging')
+        return x
     padl = w - 1
     padf = padl//2
     padb = padl - padf
