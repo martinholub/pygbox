@@ -475,7 +475,7 @@ def normalize_trace(x, how = 'last', y = None):
         xn = np.nanmean(x_[crp:])
     elif how.lower() == 'first':
         xn = np.nanmean(x_[0:4])
-    if y:
+    if y is not None:
         x = y # normalize data in y by data in X
     return x / xn
 

@@ -71,10 +71,11 @@ def plot_hist(ax, x, bins = 'fd', density = True, kwargs = {}):
 def plot_hist2(ax, x, bins = 'fd', txt = None, xlab = None, kwargshist = {}, kwargskde = {}):
     kwargs_hist = { 'ec': 'black',
                     'color':  'darkgrey',
-                    'density': True
+                    'density': True,
+                    'stacked': False
                     }
     kwargs_hist.update(kwargshist)
-    n, bins, parts = ax.hist(x, bins = bins, **kwargs_hist)
+    nnn, bins, parts = ax.hist(x, bins = bins, **kwargs_hist)
 
     kwargs_kde = {  'fill': False,
                     'lw': 3,
@@ -87,14 +88,20 @@ def plot_hist2(ax, x, bins = 'fd', txt = None, xlab = None, kwargshist = {}, kwa
     if not isinstance(txt, (str)):
         #txt = "$\mu$={:.1f}\n$\pm${:.1f} min\n n={:d}".format(xmean_, xerr_, len(x))
         xmean_, (xstd_, xerr_) = ops.summarize_data(x)
-        txt = "$\mu$={:.1f}$\pm${:.2f}".format(xmean_, xstd_)
-    annotate_ax(ax, txt = txt, x = .6, y = .8)
+        txt = "$\mu$={:.2f}\n$\pm${:.2f}".format(xmean_, np.round(xstd_,2))
+
+    annotate_ax(ax, txt = txt, x = .7, y = .75)
 
     # beatify axes
     ax.set_ylabel('frequency')
-    ax.set_yticklabels([])
-    ax.set_yticks([])
+    #ax.set_yticklabels([])
+    #ax.set_yticks([])
     #ax.set_xlabel('$t_{eq}$ [min]')
+    ax.yaxis.set_ticks_position('both')
+    ax.yaxis.set_tick_params(direction='in')
+    yticks = ax.get_yticks()
+    #ax.set_yticks(yticks, labels = ['{:.1f}'.format(x) for x in yticks/np.max(yticks)])
+    ax.set_yticklabels(['{:.1f}'.format(x) for x in yticks/np.max(yticks)])
 
     if not xlab: xlab = '$Rg/Rg_{end}$ [-]'
     ax.set_xlabel(xlab)
