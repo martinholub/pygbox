@@ -22,5 +22,6 @@ def add_gauss(data, sigma):
     data = ops.normalize(data, 0, 1)
     g_noise = rn_gen.standard_normal(data.shape) * sigma
     data = data + g_noise
+    data[data<0] = 0
     data = ops.normalize(data, 0, 1)
     return data

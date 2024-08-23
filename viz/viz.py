@@ -78,6 +78,7 @@ def framenumber(ax, i):
                 verticalalignment = 'top', color = 'white')
 
 def imannotate(ax, txt, xy = (0.95, 0.95), kwargs = {}):
+    
     """ Insert annotation on image in axes in standard way
     """
     fontprops = fm.FontProperties(size = 16, family = 'serif')
@@ -105,7 +106,7 @@ def scalebar(ax, pixel_size, length = 5, show_text = True):
 
     if pixel_size:
         fontprops = fm.FontProperties(size = 16, family = 'serif')
-        scb_col = 'black'
+        scb_col = 'white'
         scb_loc = 'lower right'
         scb_len = length / pixel_size # in data_units
 
@@ -148,11 +149,18 @@ def spots(ax, x, y = [], kwargs = {}):
     plt.show()
     return ax
 
-def fgm(ax, x):
+def fgm(ax, x, kwargs = {}):
     """Overlay foreground mask on axis"""
+
+    kwargs_ = {
+        'colors': 'white',
+        'linewidths': 2,
+        'linestyles': 'dashed'
+    }
+    kwargs_.update(kwargs)
+
     if x.ndim > 2: x = np.squeeze(x)
-    ax.contour( x, levels = 0,
-                colors = 'red', linewidths = 2, linestyles = 'dashed')
+    ax.contour( x, levels = 0, **kwargs_)
 
     # invert boolean and mask out zeros
     x = ~x.astype(np.bool)

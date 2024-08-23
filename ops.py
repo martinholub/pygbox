@@ -487,6 +487,7 @@ def moving_average(x, w):
     if w == 1:
         print('Requested win size is 1, skipping averaging')
         return x
+    if x.ndim > 1: x = x.flatten()
     padl = w - 1
     padf = padl//2
     padb = padl - padf
